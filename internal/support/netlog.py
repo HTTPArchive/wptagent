@@ -84,7 +84,7 @@ class Netlog():
                     elif line.startswith('"events": ['):
                         started = True
                 except Exception:
-                    logging.exception('Error processing netlog line')                
+                    logging.exception('Error processing netlog line')
 
     def get_requests(self):
         return self.post_process_events()
@@ -133,7 +133,7 @@ class Netlog():
                     params['load_flags'] = load_flags
                 if 'net_error' in params and 'netError' in const and params['net_error'] in const['netError']:
                     params['net_error'] = const['netError'][params['net_error']]
-            
+
     ##########################################################################
     #   Convert the raw events into requests
     ##########################################################################
@@ -399,6 +399,8 @@ class Netlog():
                                             elapsed = dns['elapsed']
                                             request['dns_start'] = dns['start']
                                             request['dns_end'] = dns['end']
+                            if 'canonical_name' in dns_lookups[hostname]:
+                                request['canonical_name'] = dns_lookups[hostname]['canonical_name']
 
                 # Find the start timestamp if we didn't have one already
                 times = ['dns_start', 'dns_end',
@@ -757,6 +759,11 @@ class Netlog():
         if name == 'HOST_RESOLVER_IMPL_CACHE_HIT':
             if 'end' not in entry or event['time'] > entry['end']:
                 entry['end'] = event['time']
+        if (name == 'HOST_RESOLVER_MANAGER_CACHE_HIT' or name == 'HOST_RESOLVER_DNS_TASK'):
+            print('Event:', name)
+            if 'results' in params and 'canonical_names' in params['results']:
+                entry['canonical_name'] = params['results']['canonical_names'][0]
+                print('canonical_name:', params['results']['canonical_names'])
         if 'host' not in entry and 'host' in params:
             entry['host'] = params['host']
         if name == 'HOST_RESOLVER_DNS_TASK' and params:
@@ -958,7 +965,6 @@ class Netlog():
                             stream = session['stream'][stream_id]
                             if 'url_request' in stream and stream['url_request'] == request_id:
                                 stream['url_request'] = new_id
-    
     def process_disk_cache_event(self, event):
         """Disk cache events"""
         if 'params' in event and 'key' in event['params']:
@@ -998,7 +1004,7 @@ def main():
 
     if not options.file:
         parser.error("Input netlog file is not specified.")
-    
+
     netlog = Netlog()
     netlog.load_netlog(options.file)
     requests = netlog.get_requests()
