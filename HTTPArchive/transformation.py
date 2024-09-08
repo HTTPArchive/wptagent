@@ -205,7 +205,6 @@ class HarJsonToSummary:
         #  consider using mimetypes library instead https://docs.python.org/3/library/mimetypes.html
         mime_type = response["content"]["mimeType"]
         ext = utils.get_ext(url)
-        typ = utils.pretty_type(mime_type, ext)
         frmt = utils.get_format(typ, mime_type, ext)
 
         ret_request.update(
@@ -315,37 +314,6 @@ class HarJsonToSummary:
             page.get("_docTime")
             if page.get("_docTime") != 0
             else max(page.get("_visualComplete"), page.get("_fullyLoaded"))
-        )
-        document_height = (
-            page["_document_height"]
-            if page.get("_document_height") and int(page["_document_height"]) > 0
-            else 0
-        )
-        document_width = (
-            page["_document_width"]
-            if page.get("_document_width") and int(page["_document_width"]) > 0
-            else 0
-        )
-        localstorage_size = (
-            page["_localstorage_size"]
-            if page.get("_localstorage_size") and int(page["_localstorage_size"]) > 0
-            else 0
-        )
-        sessionstorage_size = (
-            page["_sessionstorage_size"]
-            if page.get("_sessionstorage_size")
-            and int(page["_sessionstorage_size"]) > 0
-            else 0
-        )
-
-        avg_dom_depth = (
-            int(float(page.get("_avg_dom_depth"))) if page.get("_avg_dom_depth") else 0
-        )
-
-        doc_type = (
-            str(page.get("_doctype"))
-            if page.get("_doctype")
-            else None
         )
 
         return {
