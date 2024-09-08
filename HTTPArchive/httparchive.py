@@ -120,6 +120,7 @@ def get_custom_metrics(page, wptid, max_size=None):
             continue
 
         value = page.get(f"_{metric}")
+
         if isinstance(value, str):
             try:
                 value = json.loads(value)
