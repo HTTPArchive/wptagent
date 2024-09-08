@@ -128,10 +128,6 @@
     "type": "INTEGER"
   },
   {
-    "name": "type",
-    "type": "STRING"
-  },
-  {
     "name": "ext",
     "type": "STRING"
   },
