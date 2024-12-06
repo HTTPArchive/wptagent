@@ -246,9 +246,5 @@
   {
     "name": "bytesSvg",
     "type": "INTEGER"
-  },
-  {
-    "name": "usertiming",
-    "type": "INTEGER"
   }
 ]

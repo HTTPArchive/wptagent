@@ -778,6 +778,19 @@
     },
     "website": "https://www.webwizforums.com"
   },
+  "Web Worker Offloading": {
+    "cats": [
+      87,
+      92
+    ],
+    "description": "Performance plugin from the WordPress Performance Team, which offloads JavaScript execution to a Web Worker, improving performance by freeing up the main thread.",
+    "icon": "web-worker-offloading.svg",
+    "meta": {
+      "generator": "^web-worker-offloading ([\\d.]+)?\\;version:\\1"
+    },
+    "requires": "WordPress",
+    "website": "https://wordpress.org/plugins/web-worker-offloading/"
+  },
   "Web2py": {
     "cats": [
       18
@@ -2465,6 +2478,21 @@
       "generator": "^wisy CMS[ v]{0,3}([0-9.,]*)\\;version:\\1"
     },
     "website": "https://wisy.3we.de"
+  },
+  "wp.cloud": {
+    "cats": [
+      62,
+      88
+    ],
+    "description": "WordPress-first cloud hosting.",
+    "headers": {
+      "host-header": "wpcloud"
+    },
+    "icon": "wp-cloud.png",
+    "implies": [
+      "WordPress"
+    ],
+    "website": "https://wp.cloud/"
   },
   "wpBakery": {
     "cats": [

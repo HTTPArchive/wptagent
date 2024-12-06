@@ -104,6 +104,7 @@ class ProcessTest(object):
 
         self.save_data()
 
+        logging.debug("Preparing to generate HAR")
         if self.options.har or 'gcs_har_upload' in self.job:
             self.generate_har()
 
@@ -972,6 +973,7 @@ class ProcessTest(object):
 
     def generate_har(self):
         """Generate a HAR file for the current step"""
+        logging.debug("Generating HAR")
         try:
             page_data = self.data['pageData']
             har = {'log': {
@@ -1012,11 +1014,14 @@ class ProcessTest(object):
             # Upload the HAR to GCS for "successful" tests
             uploaded = False
             har_filename = os.path.basename(har_file)
+            needs_upload = self.job['success']
+            if not needs_upload and 'metadata' in self.job and 'retry_count' in self.job['metadata'] and self.job['metadata']['retry_count'] >= 2:
+                needs_upload = True
             if 'gcs_har_upload' in self.job and \
                     'bucket' in self.job['gcs_har_upload'] and \
                     'path' in self.job['gcs_har_upload'] and \
                     os.path.exists(har_file) and \
-                    self.job['success']:
+                    needs_upload:
                 try:
                     from google.cloud import storage
                     client = storage.Client()
@@ -1029,11 +1034,18 @@ class ProcessTest(object):
                         blob.upload_from_filename(filename=har_file)
                         uploaded = True
                         logging.debug('Uploaded HAR to gs://%s/%s', self.job['gcs_har_upload']['bucket'], gcs_path)
+                    else:
+                        logging.debug("HAR already exists, not uploading")
                 except Exception:
                     logging.exception('Error uploading HAR to Cloud Storage')
+            else:
+                logging.debug("Not uploading HAR")
             
-            if uploaded and 'bq_datastore' in self.job:
-                self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
+            if uploaded:
+                if self.job['success'] and 'bq_datastore' in self.job:
+                    self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
+                elif 'bq_datastore_failures' in self.job:
+                    self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
             
             # Delete the local HAR file if it was only supposed to be uploaded
             if not self.options.har:
@@ -1074,7 +1086,46 @@ class ProcessTest(object):
         if 'summary' in page and page['summary']:
             row.summary = page['summary']
         if 'custom_metrics' in page and page['custom_metrics']:
-            row.custom_metrics = page['custom_metrics']
+            custom_metrics = json.loads(page['custom_metrics'])
+            if 'a11y' in custom_metrics:
+                row.custom_metrics.a11y = json.dumps(custom_metrics.pop('a11y'))
+            if 'cms' in custom_metrics:
+                row.custom_metrics.cms = json.dumps(custom_metrics.pop('cms'))
+            if 'cookies' in custom_metrics:
+                row.custom_metrics.cookies = json.dumps(custom_metrics.pop('cookies'))
+            if 'css-variables' in custom_metrics:
+                row.custom_metrics.css_variables = json.dumps(custom_metrics.pop('css-variables'))
+            if 'ecommerce' in custom_metrics:
+                row.custom_metrics.ecommerce = json.dumps(custom_metrics.pop('ecommerce'))
+            if 'element_count' in custom_metrics:
+                row.custom_metrics.element_count = json.dumps(custom_metrics.pop('element_count'))
+            if 'javascript' in custom_metrics:
+                row.custom_metrics.javascript = json.dumps(custom_metrics.pop('javascript'))
+            if 'markup' in custom_metrics:
+                row.custom_metrics.markup = json.dumps(custom_metrics.pop('markup'))
+            if 'media' in custom_metrics:
+                row.custom_metrics.media = json.dumps(custom_metrics.pop('media'))
+            if 'origin-trials' in custom_metrics:
+                row.custom_metrics.origin_trials = json.dumps(custom_metrics.pop('origin-trials'))
+            if 'performance' in custom_metrics:
+                row.custom_metrics.performance = json.dumps(custom_metrics.pop('performance'))
+            if 'privacy' in custom_metrics:
+                row.custom_metrics.privacy = json.dumps(custom_metrics.pop('privacy'))
+            if 'responsive_images' in custom_metrics:
+                row.custom_metrics.responsive_images = json.dumps(custom_metrics.pop('responsive_images'))
+            if 'robots_txt' in custom_metrics:
+                row.custom_metrics.robots_txt = json.dumps(custom_metrics.pop('robots_txt'))
+            if 'security' in custom_metrics:
+                row.custom_metrics.security = json.dumps(custom_metrics.pop('security'))
+            if 'structured-data' in custom_metrics:
+                row.custom_metrics.structured_data = json.dumps(custom_metrics.pop('structured-data'))
+            if 'third-parties' in custom_metrics:
+                row.custom_metrics.third_parties = json.dumps(custom_metrics.pop('third-parties'))
+            if 'well-known' in custom_metrics:
+                row.custom_metrics.well_known = json.dumps(custom_metrics.pop('well-known'))
+            if 'wpt_bodies' in custom_metrics:
+                row.custom_metrics.wpt_bodies = json.dumps(custom_metrics.pop('wpt_bodies'))
+            row.custom_metrics.other = json.dumps(custom_metrics)
         if 'lighthouse' in page and page['lighthouse']:
             row.lighthouse = page['lighthouse']
         if 'metadata' in page and page['metadata']:
@@ -1118,6 +1169,8 @@ class ProcessTest(object):
         if 'is_root_page' in request and request['is_root_page'] is not None:
             row.is_root_page = request['is_root_page']
         row.root_page = request['root_page']
+        if 'rank' in request and request['rank'] is not None:
+            row.rank = request['rank']
         if 'url' in request and request['url']:
             row.url = request['url']
         if 'is_main_document' in request and request['is_main_document'] is not None:
@@ -1162,6 +1215,8 @@ class ProcessTest(object):
         row.client = parsed_css['client']
         row.page = parsed_css['page']
         row.is_root_page = parsed_css['is_root_page']
+        row.root_page = parsed_css['root_page']
+        row.rank = parsed_css['rank']
         row.url = parsed_css['url']
         row.css = parsed_css['css']
 

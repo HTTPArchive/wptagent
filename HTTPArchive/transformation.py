@@ -134,6 +134,8 @@ class HarJsonToSummary:
         ret_request = {
             "client": status_info["client"],
             "date": status_info["date"],
+            "metadata": status_info["metadata"],
+            # we use this below for expAge calculation
             "time": entry["time"],
             "_cdn_provider": entry.get("_cdn_provider"),
             # amount response WOULD have been reduced if it had been gzipped
@@ -280,9 +282,6 @@ class HarJsonToSummary:
                 """
 
         ret_request.update({"expAge": int(max(exp_age, 0))})
-
-        # NOW add all the headers from both the request and response.
-        ret_request.update({k: ", ".join(v) for k, v in request_headers.items()})
 
         # TODO implement custom rules?
         # https://github.com/HTTPArchive/legacy.httparchive.org/blob/de08e0c7c94a7da529826f0a4429a9d28b8fdf5e/bulktest/batch_lib.inc#L658-L664
