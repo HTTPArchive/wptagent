@@ -171,8 +171,6 @@ class HarJsonToSummary:
             {
                 "method": request["method"],
                 "httpVersion": request["httpVersion"],
-                "url": url,
-                "urlShort": url[:255],
                 "reqHeadersSize": req_headers_size,
                 "reqBodySize": req_body_size,
                 "reqCookieLen": request_cookie_size,
@@ -209,14 +207,12 @@ class HarJsonToSummary:
         #  consider using mimetypes library instead https://docs.python.org/3/library/mimetypes.html
         mime_type = response["content"]["mimeType"]
         ext = utils.get_ext(url)
-        typ = utils.pretty_type(mime_type, ext)
         frmt = utils.get_format(typ, mime_type, ext)
 
         ret_request.update(
             {
                 "mimeType": mime_type.lower(),
                 "ext": ext.lower(),
-                "type": typ.lower(),
                 "format": frmt.lower(),
             }
         )
@@ -262,7 +258,7 @@ class HarJsonToSummary:
                 start_date = (
                     date_parser.parse(response_headers.get("resp_date")[0]).timestamp()
                     if "resp_date" in response_headers
-                    else ret_request["startedDateTime"]
+                    else utils.datetime_to_epoch(entry["startedDateTime"], status_info)
                 )
                 end_date = date_parser.parse(
                     response_headers["resp_expires"][0]
@@ -318,53 +314,10 @@ class HarJsonToSummary:
             if page.get("_docTime") != 0
             else max(page.get("_visualComplete"), page.get("_fullyLoaded"))
         )
-        document_height = (
-            page["_document_height"]
-            if page.get("_document_height") and int(page["_document_height"]) > 0
-            else 0
-        )
-        document_width = (
-            page["_document_width"]
-            if page.get("_document_width") and int(page["_document_width"]) > 0
-            else 0
-        )
-        localstorage_size = (
-            page["_localstorage_size"]
-            if page.get("_localstorage_size") and int(page["_localstorage_size"]) > 0
-            else 0
-        )
-        sessionstorage_size = (
-            page["_sessionstorage_size"]
-            if page.get("_sessionstorage_size")
-            and int(page["_sessionstorage_size"]) > 0
-            else 0
-        )
-
-        avg_dom_depth = (
-            int(float(page.get("_avg_dom_depth"))) if page.get("_avg_dom_depth") else 0
-        )
-
-        doc_type = (
-            str(page.get("_doctype"))
-            if page.get("_doctype")
-            else None
-        )
 
         return {
-            "metadata": json.dumps(status_info["metadata"]),
             "client": status_info["client"],
             "date": status_info["date"],
-            "pageid": status_info["pageid"],
-            "createDate": utils.clamp_integer(datetime.datetime.now().timestamp()),
-            "startedDateTime": utils.datetime_to_epoch(
-                page["startedDateTime"], status_info
-            ),
-            "archive": status_info["archive"],
-            "label": status_info["label"],
-            "crawlid": status_info["crawlid"],
-            "url": status_info["page"],
-            "urlhash": utils.get_url_hash(status_info["page"]),
-            "urlShort": status_info["page"][:255],
             "TTFB": page.get("_TTFB"),
             "renderStart": page.get("_render"),
             "fullyLoaded": page.get("_fullyLoaded"),
@@ -376,21 +329,7 @@ class HarJsonToSummary:
             "onContentLoaded": page.get("_domContentLoadedEventStart"),
             "cdn": page.get("_base_page_cdn"),
             "SpeedIndex": page.get("_SpeedIndex"),
-            "PageSpeed": page.get("_pageSpeed", {}).get("score"),
             "_connections": page.get("_connections"),
-            "_adult_site": page.get("_adult_site", False),
-            "avg_dom_depth": avg_dom_depth,
-            "doctype": doc_type,
-            "document_height": document_height,
-            "document_width": document_width,
-            "localstorage_size": localstorage_size,
-            "sessionstorage_size": sessionstorage_size,
-            "meta_viewport": page.get("_meta_viewport"),
-            "num_iframes": page.get("_num_iframes"),
-            "num_scripts": page.get("_num_scripts"),
-            "num_scripts_sync": page.get("_num_scripts_sync"),
-            "num_scripts_async": page.get("_num_scripts_async"),
-            "usertiming": page.get("_usertiming"),
         }
 
     @staticmethod
@@ -562,9 +501,6 @@ class HarJsonToSummary:
                 "numHttps": num_https,
                 "numCompressed": num_compressed,
                 "maxDomainReqs": max_domain_reqs,
-                "wptid": status_info["wptid"],
-                "wptrun": status_info["medianRun"],
-                "rank": status_info["rank"],
             }
         )
 
