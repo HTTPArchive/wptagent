@@ -1272,7 +1272,7 @@ class ProcessTest(object):
             elif table == 'parsed_css':
                 all_parsed_css_pb2.CSSRecord.DESCRIPTOR.CopyToProto(proto_descriptor)
             elif table == 'script_chunks':
-                script_chunks_pb2.CSSRecord.DESCRIPTOR.CopyToProto(proto_descriptor)
+                script_chunks_pb2.ScriptChunkRecord.DESCRIPTOR.CopyToProto(proto_descriptor)
             proto_schema.proto_descriptor = proto_descriptor
             proto_data = types.AppendRowsRequest.ProtoData()
             proto_data.writer_schema = proto_schema
