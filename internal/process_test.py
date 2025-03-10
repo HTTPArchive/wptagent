@@ -1035,7 +1035,7 @@ class ProcessTest(object):
                         uploaded = True
                         logging.debug('Uploaded HAR to gs://%s/%s', self.job['gcs_har_upload']['bucket'], gcs_path)
                     else:
-                        logging.debug("HAR already exists, not uploading")
+                        logging.debug("HAR already exists, not uploading: gs://%s/%s", self.job['gcs_har_upload']['bucket'], gcs_path)
                 except Exception:
                     logging.exception('Error uploading HAR to Cloud Storage')
             else:
