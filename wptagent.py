@@ -209,6 +209,8 @@ class WPTAgent(object):
                 run_time = (monotonic() - start_time) / 60.0
                 if run_time > self.options.exit:
                     done = True
+            if self.options.once:
+                done = True
             # Exit if adb is having issues (will cause a reboot after several tries)
             if self.adb is not None and self.adb.needs_exit:
                 done = True
@@ -1208,6 +1210,8 @@ def main():
                         help='Exit after the specified number of minutes.\n'
                         '    Useful for running in a shell script that does some maintenance\n'
                         '    or updates periodically (like hourly).')
+    parser.add_argument('--once', action='store_true', default=False,
+                        help="Run one test and exit.")
     parser.add_argument('--dockerized', action='store_true', default=False,
                         help="Agent is running in a docker container.")
     parser.add_argument('--ec2', action='store_true', default=False,
