@@ -605,7 +605,7 @@ class DevTools(object):
                 if response is not None and 'result' in response and 'scriptSource' in response['result']:
                     src = response['result']['scriptSource']
                     if len(src) > 100:
-                        scripts[id] = {'url': url, 'src': src, 'size': len(src)}
+                        scripts[id] = {'url': url, 'src': src}
             if len(scripts):
                 scripts_file = self.path_base + '_scripts.json'
                 with open(scripts_file, 'wt') as f_out:

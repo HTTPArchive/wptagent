@@ -1239,10 +1239,9 @@ class ProcessTest(object):
         row.url = chunk['url']
         row.hash = chunk['hash']
         row.content = chunk['content']
+        row.size = len(row.content)
         if 'chunk_type' in chunk and chunk['chunk_type'] is not None:
             row.chunk_type = chunk['chunk_type']
-        if 'size' in chunk and chunk['size'] is not None:
-            row.size = chunk['size']
 
         return row.SerializeToString()
 
@@ -1329,8 +1328,7 @@ class ProcessTest(object):
                                  'url': c['url'],
                                  'hash': c['hash'],
                                  'content': c['src'],
-                                 'chunk_type': c['type'],
-                                 'size': c['size'],}
+                                 'chunk_type': c['type']}
                         chunks.append(chunk)
         except Exception:
             logging.exception("Error processing script chunks")
