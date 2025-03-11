@@ -1330,6 +1330,7 @@ class ProcessTest(object):
                                  'content': c['src'],
                                  'chunk_type': c['type']}
                         chunks.append(chunk)
+                os.unlink(script_chunks_file)
         except Exception:
             logging.exception("Error processing script chunks")
 
