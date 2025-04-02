@@ -304,5 +304,14 @@
     "302": "Manifest",
     "303": "BeforeInstallPrompt",
     "304": "AppShareTargets",
-    "305": "AppShortcuts"
+    "305": "AppShortcuts",
+    "306": "FetchLater",
+    "307": "DRAFT_WasmBranchHinting",
+    "308": "DRAFT_ExplicitResourceManagement",
+    "309": "LaunchHandler",
+    "310": "DRAFT_CssFunction",
+    "311": "DRAFT_CssIf",
+    "312": "WebAppManifestUpdateToken",
+    "313": "ReadingFlow",
+    "314": "ComposedRanges"
 }
