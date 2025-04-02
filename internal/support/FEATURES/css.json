@@ -845,5 +845,9 @@
     "843": "CSSPropertyScrollMarkerContain",
     "844": "CSSPropertyRowRuleStyle",
     "845": "CSSPropertyGapRulePaintOrder",
-    "846": "CSSPropertyRowRuleWidth"
+    "846": "CSSPropertyRowRuleWidth",
+    "847": "CSSPropertyRowRuleColor",
+    "848": "CSSPropertyPrintColorAdjust",
+    "849": "CSSPropertyColumnHeight",
+    "850": "CSSPropertyColumnWrap"
 }
