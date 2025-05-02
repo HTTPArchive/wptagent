@@ -849,5 +849,8 @@
     "847": "CSSPropertyRowRuleColor",
     "848": "CSSPropertyPrintColorAdjust",
     "849": "CSSPropertyColumnHeight",
-    "850": "CSSPropertyColumnWrap"
+    "850": "CSSPropertyColumnWrap",
+    "851": "CSSPropertyRuleColor",
+    "852": "CSSPropertyRuleWidth",
+    "853": "CSSPropertyRuleStyle"
 }

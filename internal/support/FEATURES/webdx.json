@@ -313,5 +313,22 @@
     "311": "DRAFT_CssIf",
     "312": "WebAppManifestUpdateToken",
     "313": "ReadingFlow",
-    "314": "ComposedRanges"
+    "314": "ComposedRanges",
+    "315": "CompressionDictionaryTransport",
+    "316": "Http3",
+    "317": "SpeculationRules",
+    "318": "TextBox",
+    "319": "ScrollInitialTarget",
+    "320": "HasSlotted",
+    "321": "ElementCapture",
+    "322": "RegionCapture",
+    "323": "RequestAnimationFrame",
+    "325": "IframeCredentialless",
+    "326": "Urlpattern",
+    "327": "WebauthnPublicKeyEasy",
+    "328": "IntlDisplayNames",
+    "329": "State",
+    "330": "PrintColorAdjust",
+    "331": "TextUnderlineOffset",
+    "332": "WindowManagement"
 }
