@@ -330,5 +330,15 @@
     "329": "State",
     "330": "PrintColorAdjust",
     "331": "TextUnderlineOffset",
-    "332": "WindowManagement"
+    "332": "WindowManagement",
+    "333": "Requestclose",
+    "334": "Uint8ArrayBase64Hex",
+    "335": "LineBreak",
+    "336": "OverflowClip",
+    "337": "LightDark",
+    "338": "Requestidlecallback",
+    "339": "ClearSiteData",
+    "340": "LinkRelExpect",
+    "341": "UaClientHints",
+    "342": "CustomizableSelect"
 }
