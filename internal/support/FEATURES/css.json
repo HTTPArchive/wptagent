@@ -852,5 +852,10 @@
     "850": "CSSPropertyColumnWrap",
     "851": "CSSPropertyRuleColor",
     "852": "CSSPropertyRuleWidth",
-    "853": "CSSPropertyRuleStyle"
+    "853": "CSSPropertyRuleStyle",
+    "854": "CSSPropertyCaretShape",
+    "855": "CSSPropertyRowRule",
+    "856": "CSSPropertyTextGrow",
+    "857": "CSSPropertyTextShrink",
+    "858": "CSSPropertyRule"
 }
