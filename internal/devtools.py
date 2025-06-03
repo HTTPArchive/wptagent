@@ -51,6 +51,8 @@ class DevTools(object):
         self.pending_body_requests = {}
         self.pending_commands = []
         self.console_log = []
+        self.console_log_raw = []
+        self.browser_log = []
         self.audit_issues = []
         self.performance_timing = []
         self.workers = []
@@ -120,6 +122,8 @@ class DevTools(object):
         self.request_count = 0
         self.response_bodies = {}
         self.console_log = []
+        self.console_log_raw = []
+        self.browser_log = []
         self.audit_issues = []
         self.performance_timing = []
         self.scripts = {}
@@ -580,6 +584,12 @@ class DevTools(object):
             contexts.append(self.execution_contexts[id])
         if len(contexts):
             self.task['page_data']['execution_contexts'] = contexts
+        # Add the raw console log API calls
+        if len(self.console_log_raw):
+            self.task['page_data']['console_api'] = self.console_log_raw
+        # Add the browser logs
+        if len(self.browser_log):
+            self.task['page_data']['browser_logs'] = self.browser_log
         # Process the timeline data
         if self.trace_parser is not None:
             start = monotonic()
@@ -1521,7 +1531,7 @@ class DevTools(object):
                 elif category == 'Console' and self.recording:
                     self.process_console_event(event, msg)
                 elif category == 'Log' and self.recording:
-                    self.process_console_event(event, msg)
+                    self.process_log_event(event, msg)
                 elif category == 'Audits' and self.recording:
                     self.process_audit_event(event, msg)
                 elif category == 'Inspector' and target_id is None:
@@ -1550,12 +1560,10 @@ class DevTools(object):
                 self.command_responses[response_id] = msg
 
     def process_console_event(self, event, msg):
-        """Handle Console.* and Log.* events"""
+        """Handle Console.* events"""
         message = None
-        if event == 'messageAdded' and 'message' in msg['params']:
+        if event == 'messageAdded' and 'params' in msg and 'message' in msg['params']:
             message = msg['params']['message']
-        elif event == 'entryAdded' and 'entry' in msg['params']:
-            message = msg['params']['entry']
         
         if message is not None:
             if 'text' in message and message['text'].startswith('wptagent_message:'):
@@ -1570,6 +1578,11 @@ class DevTools(object):
                     logging.exception('Error decoding console log message')
             else:
                 self.console_log.append(message)
+
+    def process_log_event(self, event, msg):
+        """Handle Log.* events"""
+        if event == 'entryAdded' and 'params' in msg and 'entry' in msg['params']:
+            self.browser_log.append(msg['params']['entry'])
 
     def process_audit_event(self, event, msg):
         """Handle Audits.* events"""
@@ -1679,6 +1692,51 @@ class DevTools(object):
                 if id in self.execution_contexts:
                     del self.execution_contexts[id]
                     logging.debug('Execution context %d deleted', id)
+        elif event == 'consoleAPICalled' and 'params' in msg and 'type' in msg['params'] and 'args' in msg['params'] and 'wptagent_message:' not in json.dumps(msg):
+            args = msg['params']['args']
+
+            # Format the console log entry
+            log_entry = {'type': msg['params']['type']}
+            text = ''
+            data = []
+            for arg in args:
+                if 'type' in arg:
+                    if 'value' in arg:
+                        if text:
+                            text += ' '
+                        text += arg['value']
+                    elif 'preview' in arg:
+                        values = {}
+                        if 'description' in arg['preview']:
+                            if text:
+                                text += ' '
+                            text += '[' + arg['preview']['description'] + ']'
+                        if 'properties' in arg['preview']:
+                            for property in arg['preview']['properties']:
+                                if 'name' in property and 'value' in property:
+                                    values[property['name']] = property['value']
+                        if 'entries' in arg['preview']:
+                            for entry in arg['preview']['entries']:
+                                if 'key' in property and 'value' in property:
+                                    values[property['name']] = property['value']
+                        if values:
+                            data.append(values)
+            if len(text):
+                log_entry['text'] = text
+            if data:
+                log_entry['data'] = data
+
+            # Add the stack trace
+            if 'stackTrace' in msg['params'] and 'callFrames' in msg['params']['stackTrace'] and len(msg['params']['stackTrace']['callFrames']):
+                frame = msg['params']['stackTrace']['callFrames'][0]
+                if 'url' in frame and 'lineNumber' in frame:
+                    stack = {'url': frame['url'],
+                             'line': str(frame['lineNumber']) + ':' + str(frame['columnNumber']) if 'columnNumber' in frame else str(frame['lineNumber'])}
+                    if 'functionName' in frame and frame['functionName']:
+                        stack['function'] = frame['functionName']
+                    log_entry['stack'] = stack
+
+            self.console_log_raw.append(log_entry)
 
     def process_network_event(self, event, msg, target_id=None):
         """Process Network.* dev tools events"""
