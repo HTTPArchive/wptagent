@@ -1735,6 +1735,9 @@ class DevTools(object):
                     if 'functionName' in frame and frame['functionName']:
                         stack['function'] = frame['functionName']
                     log_entry['stack'] = stack
+            
+            if 'executionContextId' in msg['params']:
+                log_entry['contextID'] = msg['params']['executionContextId']
 
             self.console_log_raw.append(log_entry)
 
