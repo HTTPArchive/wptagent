@@ -1041,6 +1041,15 @@ class ProcessTest(object):
             else:
                 logging.debug("Not uploading HAR")
             
+            # mark successful tests as having been run in memcache
+            is_new_test = False
+            if 'memcache' in self.job:
+                is_new_test = self.job['memcache'].add(self.task['id'], 1)
+                if not is_new_test:
+                    logging.debug("Test %s already exists in memcache", self.task['id'])
+            
+            # TODO: change this to use memcache as the source of the test already having been processed
+            # if is_new_test and needs_upload and os.path.exists(har_file):
             if uploaded:
                 if self.job['success'] and 'bq_datastore' in self.job:
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
