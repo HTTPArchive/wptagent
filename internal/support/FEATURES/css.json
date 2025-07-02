@@ -857,5 +857,17 @@
     "855": "CSSPropertyRowRule",
     "856": "CSSPropertyTextGrow",
     "857": "CSSPropertyTextShrink",
-    "858": "CSSPropertyRule"
+    "858": "CSSPropertyRule",
+    "859": "CSSPropertyOriginTrialTestShorthand",
+    "860": "CSSPropertyCornerTopShape",
+    "861": "CSSPropertyCornerRightShape",
+    "862": "CSSPropertyCornerBottomShape",
+    "863": "CSSPropertyCornerLeftShape",
+    "864": "CSSPropertyCornerBlockStartShape",
+    "865": "CSSPropertyCornerBlockEndShape",
+    "866": "CSSPropertyCornerInlineStartShape",
+    "867": "CSSPropertyCornerInlineEndShape",
+    "868": "CSSPropertyCorners",
+    "869": "CSSPropertyBorderShape",
+    "870": "CSSPropertyAnimationTriggerBehavior"
 }
