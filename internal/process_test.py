@@ -1012,49 +1012,24 @@ class ProcessTest(object):
                 json.dump(har, f)
             
             # Upload the HAR to GCS for "successful" tests
-            uploaded = False
             har_filename = os.path.basename(har_file)
             needs_upload = self.job['success']
             if not needs_upload and 'metadata' in self.job and 'retry_count' in self.job['metadata'] and self.job['metadata']['retry_count'] >= 2:
                 needs_upload = True
-            if 'gcs_har_upload' in self.job and \
-                    'bucket' in self.job['gcs_har_upload'] and \
-                    'path' in self.job['gcs_har_upload'] and \
-                    os.path.exists(har_file) and \
-                    needs_upload:
-                try:
-                    from google.cloud import storage
-                    client = storage.Client()
-                    bucket = client.get_bucket(self.job['gcs_har_upload']['bucket'])
-                    prefix = '' if self.prefix == '1' else '_' + self.prefix
-                    gcs_path = os.path.join(self.job['gcs_har_upload']['path'], self.task['id'] + prefix + '.har.gz')
-                    har_filename = gcs_path
-                    blob = bucket.blob(gcs_path)
-                    if not blob.exists():
-                        blob.upload_from_filename(filename=har_file)
-                        uploaded = True
-                        logging.debug('Uploaded HAR to gs://%s/%s', self.job['gcs_har_upload']['bucket'], gcs_path)
-                    else:
-                        logging.debug("HAR already exists, not uploading: gs://%s/%s", self.job['gcs_har_upload']['bucket'], gcs_path)
-                except Exception:
-                    logging.exception('Error uploading HAR to Cloud Storage')
-            else:
-                logging.debug("Not uploading HAR")
             
             # mark successful tests as having been run in memcache (cache the result for 10 days)
             is_new_test = False
-            if 'memcache' in self.job:
+            if needs_upload and 'memcache' in self.job:
                 is_new_test = self.job['memcache'].add(self.task['id'], 1, expire=864000)
                 if not is_new_test:
                     logging.debug("Test %s already exists in memcache", self.task['id'])
             
             # TODO: change this to use memcache as the source of the test already having been processed
-            # if is_new_test and needs_upload and os.path.exists(har_file):
-            if uploaded:
+            if is_new_test and os.path.exists(har_file):
                 if self.job['success'] and 'bq_datastore' in self.job:
-                    self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
+                    self.job['uploaded'] = self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
                 elif 'bq_datastore_failures' in self.job:
-                    self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
+                    self.job['uploaded'] = self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
             
             # Delete the local HAR file if it was only supposed to be uploaded
             if not self.options.har:
@@ -1364,8 +1339,10 @@ class ProcessTest(object):
                 self.bigquery_write(write_client, datastore, requests, 'requests')
                 self.bigquery_write(write_client, datastore, parsed_css, 'parsed_css')
                 self.bigquery_write(write_client, datastore, script_chunks, 'script_chunks')
+            return True
         except Exception:
             logging.exception('Error uploading to bigquery')
+            return False
 
     def get_har_page_data(self):
         """Transform the page_data into HAR format"""
