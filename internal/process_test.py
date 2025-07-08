@@ -1019,9 +1019,9 @@ class ProcessTest(object):
             
             if needs_upload and os.path.exists(har_file):
                 if self.job['success'] and 'bq_datastore' in self.job:
-                    self.job['uploaded'] = self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
+                    self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
                 elif 'bq_datastore_failures' in self.job:
-                    self.job['uploaded'] = self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
+                    self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
             
             # Delete the local HAR file if it was only supposed to be uploaded
             if not self.options.har:
@@ -1331,10 +1331,8 @@ class ProcessTest(object):
                 self.bigquery_write(write_client, datastore, requests, 'requests')
                 self.bigquery_write(write_client, datastore, parsed_css, 'parsed_css')
                 self.bigquery_write(write_client, datastore, script_chunks, 'script_chunks')
-            return True
         except Exception:
             logging.exception('Error uploading to bigquery')
-            return False
 
     def get_har_page_data(self):
         """Transform the page_data into HAR format"""
