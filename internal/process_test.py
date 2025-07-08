@@ -1041,10 +1041,10 @@ class ProcessTest(object):
             else:
                 logging.debug("Not uploading HAR")
             
-            # mark successful tests as having been run in memcache
+            # mark successful tests as having been run in memcache (cache the result for 10 days)
             is_new_test = False
             if 'memcache' in self.job:
-                is_new_test = self.job['memcache'].add(self.task['id'], 1)
+                is_new_test = self.job['memcache'].add(self.task['id'], 1, expire=864000)
                 if not is_new_test:
                     logging.debug("Test %s already exists in memcache", self.task['id'])
             
