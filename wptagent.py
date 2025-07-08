@@ -44,7 +44,6 @@ class WPTAgent(object):
         self.job = None
         self.beanstalk_job = None
         self.beanstalk = None
-        self.memcache = None
         self.task = None
         self.xvfb = None
         self.hostname = socket.gethostname()
@@ -241,12 +240,6 @@ class WPTAgent(object):
             import zlib
             if self.beanstalk is None:
                 self.beanstalk = greenstalk.Client((self.options.beanstalk, 11300), encoding=None, watch='crawl', use='alive')
-            if self.memcache is None:
-                try:
-                    from pymemcache.client.base import Client
-                    self.memcache = Client(self.options.beanstalk, connect_timeout=10, timeout=10, no_delay=True)
-                except Exception:
-                    logging.exception("Error connecting to memcache")
             self.beanstalk_job = self.beanstalk.reserve(30)
             stats = self.beanstalk.stats_job(self.beanstalk_job)
             if stats and 'timeouts' in stats and stats['timeouts'] >= 3:
@@ -262,8 +255,6 @@ class WPTAgent(object):
                 raw = self.beanstalk_job.body
                 test_json = json.loads(zlib.decompress(raw).decode())
                 self.job = self.wpt.process_job_json(test_json)
-                if self.memcache is not None:
-                    self.job['memcache'] = self.memcache
         except greenstalk.TimedOutError:
             pass
         except Exception:

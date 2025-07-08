@@ -1017,15 +1017,7 @@ class ProcessTest(object):
             if not needs_upload and 'metadata' in self.job and 'retry_count' in self.job['metadata'] and self.job['metadata']['retry_count'] >= 2:
                 needs_upload = True
             
-            # mark successful tests as having been run in memcache (cache the result for 10 days)
-            is_new_test = False
-            if needs_upload and 'memcache' in self.job:
-                is_new_test = self.job['memcache'].add(self.task['id'], 1, expire=864000)
-                if not is_new_test:
-                    logging.debug("Test %s already exists in memcache", self.task['id'])
-            
-            # TODO: change this to use memcache as the source of the test already having been processed
-            if is_new_test and os.path.exists(har_file):
+            if needs_upload and os.path.exists(har_file):
                 if self.job['success'] and 'bq_datastore' in self.job:
                     self.job['uploaded'] = self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
                 elif 'bq_datastore_failures' in self.job:
