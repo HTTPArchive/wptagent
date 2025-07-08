@@ -1280,6 +1280,7 @@ class ProcessTest(object):
             for response in responses:
                 result = response.result()
         except Exception:
+            self.job['success'] = False
             logging.exception('Error writing to bigquery')
 
     def get_script_chunks(self, pages):
@@ -1332,6 +1333,7 @@ class ProcessTest(object):
                 self.bigquery_write(write_client, datastore, parsed_css, 'parsed_css')
                 self.bigquery_write(write_client, datastore, script_chunks, 'script_chunks')
         except Exception:
+            self.job['success'] = False
             logging.exception('Error uploading to bigquery')
 
     def get_har_page_data(self):
