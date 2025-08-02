@@ -869,5 +869,16 @@
     "867": "CSSPropertyCornerInlineEndShape",
     "868": "CSSPropertyCorners",
     "869": "CSSPropertyBorderShape",
-    "870": "CSSPropertyAnimationTriggerBehavior"
+    "870": "CSSPropertyAnimationTriggerBehavior",
+    "871": "CSSPropertyTimelineTriggerName",
+    "872": "CSSPropertyTimelineTriggerBehavior",
+    "873": "CSSPropertyTimelineTriggerRangeStart",
+    "874": "CSSPropertyTimelineTriggerRangeEnd",
+    "875": "CSSPropertyTimelineTriggerExitRangeStart",
+    "876": "CSSPropertyTimelineTriggerExitRangeEnd",
+    "877": "CSSPropertyTimelineTriggerTimeline",
+    "878": "CSSPropertyTimelineTrigger",
+    "879": "CSSPropertyMasonry",
+    "880": "CSSPropertyContinue",
+    "881": "CSSPropertyMaxLines"
 }
