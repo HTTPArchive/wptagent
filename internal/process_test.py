@@ -1012,12 +1012,36 @@ class ProcessTest(object):
                 json.dump(har, f)
             
             # Upload the HAR to GCS for "successful" tests
+            uploaded = False
             har_filename = os.path.basename(har_file)
             needs_upload = self.job['success']
             if not needs_upload and 'metadata' in self.job and 'retry_count' in self.job['metadata'] and self.job['metadata']['retry_count'] >= 2:
                 needs_upload = True
+            if 'gcs_har_upload' in self.job and \
+                    'bucket' in self.job['gcs_har_upload'] and \
+                    'path' in self.job['gcs_har_upload'] and \
+                    os.path.exists(har_file) and \
+                    needs_upload:
+                try:
+                    from google.cloud import storage
+                    client = storage.Client()
+                    bucket = client.get_bucket(self.job['gcs_har_upload']['bucket'])
+                    prefix = '' if self.prefix == '1' else '_' + self.prefix
+                    gcs_path = os.path.join(self.job['gcs_har_upload']['path'], self.task['id'] + prefix + '.har.gz')
+                    har_filename = gcs_path
+                    blob = bucket.blob(gcs_path)
+                    if not blob.exists():
+                        blob.upload_from_filename(filename=har_file)
+                        uploaded = True
+                        logging.debug('Uploaded HAR to gs://%s/%s', self.job['gcs_har_upload']['bucket'], gcs_path)
+                    else:
+                        logging.debug("HAR already exists, not uploading: gs://%s/%s", self.job['gcs_har_upload']['bucket'], gcs_path)
+                except Exception:
+                    logging.exception('Error uploading HAR to Cloud Storage')
+            else:
+                logging.debug("Not uploading HAR")
             
-            if needs_upload and os.path.exists(har_file):
+            if uploaded:
                 if self.job['success'] and 'bq_datastore' in self.job:
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
                 elif 'bq_datastore_failures' in self.job:
@@ -1280,7 +1304,6 @@ class ProcessTest(object):
             for response in responses:
                 result = response.result()
         except Exception:
-            self.job['success'] = False
             logging.exception('Error writing to bigquery')
 
     def get_script_chunks(self, pages):
@@ -1333,7 +1356,6 @@ class ProcessTest(object):
                 self.bigquery_write(write_client, datastore, parsed_css, 'parsed_css')
                 self.bigquery_write(write_client, datastore, script_chunks, 'script_chunks')
         except Exception:
-            self.job['success'] = False
             logging.exception('Error uploading to bigquery')
 
     def get_har_page_data(self):
