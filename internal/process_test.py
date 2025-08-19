@@ -1284,21 +1284,24 @@ class ProcessTest(object):
             responses = []
             for row in rows:
                 # Add the actual rows
-                proto_rows = types.ProtoRows()
-                if table == 'pages':
-                    proto_rows.serialized_rows.append(self.create_page_row(row))
-                elif table == 'requests':
-                    proto_rows.serialized_rows.append(self.create_request_row(row))
-                elif table == 'parsed_css':
-                    proto_rows.serialized_rows.append(self.create_parsed_css_row(row))
-                elif table == 'script_chunks':
-                    proto_rows.serialized_rows.append(self.create_script_chunk_row(row))
+                try:
+                    proto_rows = types.ProtoRows()
+                    if table == 'pages':
+                        proto_rows.serialized_rows.append(self.create_page_row(row))
+                    elif table == 'requests':
+                        proto_rows.serialized_rows.append(self.create_request_row(row))
+                    elif table == 'parsed_css':
+                        proto_rows.serialized_rows.append(self.create_parsed_css_row(row))
+                    elif table == 'script_chunks':
+                        proto_rows.serialized_rows.append(self.create_script_chunk_row(row))
 
-                request = types.AppendRowsRequest()
-                proto_data = types.AppendRowsRequest.ProtoData()
-                proto_data.rows = proto_rows
-                request.proto_rows = proto_data
-                responses.append(append_rows_stream.send(request))
+                    request = types.AppendRowsRequest()
+                    proto_data = types.AppendRowsRequest.ProtoData()
+                    proto_data.rows = proto_rows
+                    request.proto_rows = proto_data
+                    responses.append(append_rows_stream.send(request))
+                except Exception:
+                    logging.exception('Error adding row to bigquery data')
 
             # wait for the requests to complete
             for response in responses:
