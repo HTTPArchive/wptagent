@@ -49,6 +49,7 @@ CHROME_COMMAND_LINE_OPTIONS = [
 ]
 
 HOST_RULES = [
+    '"MAP android.clients.google.com 127.0.0.1"',
     '"MAP cache.pack.google.com 127.0.0.1"',
     '"MAP clients1.google.com 127.0.0.1"',
     '"MAP edge.microsoft.com 127.0.0.1"',
