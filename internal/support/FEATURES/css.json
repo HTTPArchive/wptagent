@@ -880,5 +880,6 @@
     "878": "CSSPropertyTimelineTrigger",
     "879": "CSSPropertyMasonry",
     "880": "CSSPropertyContinue",
-    "881": "CSSPropertyMaxLines"
+    "881": "CSSPropertyMaxLines",
+    "882": "CSSPropertyBlockEllipsis"
 }
