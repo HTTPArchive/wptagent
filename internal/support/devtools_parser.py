@@ -240,6 +240,12 @@ class DevToolsParser(object):
                                 request['initiator'] = params['initiator']
                             if 'documentURL' in params:
                                 request['documentURL'] = params['documentURL']
+                            if 'isLinkPreload' in params:
+                                request['isLinkPreload'] = params['isLinkPreload']
+                            if 'isSameSite' in params:
+                                request['isSameSite'] = params['isSameSite']
+                            if 'isAdRelated' in params:
+                                request['isAdRelated'] = params['isAdRelated']
                             # Redirects re-use the same ID so we need to fake a new request
                             if request_id in raw_requests:
                                 if 'redirectResponse' in params:
@@ -490,6 +496,12 @@ class DevToolsParser(object):
                     request['url'] += '?' + parts.query
                 if 'documentURL' in raw_request:
                     request['documentURL'] = raw_request['documentURL']
+                if 'isLinkPreload' in raw_request:
+                    request['isLinkPreload'] = raw_request['isLinkPreload']
+                if 'isSameSite' in raw_request:
+                    request['isSameSite'] = raw_request['isSameSite']
+                if 'isAdRelated' in raw_request:
+                    request['isAdRelated'] = raw_request['isAdRelated']
                 request['responseCode'] = -1
                 if 'response' in raw_request and 'status' in raw_request['response']:
                     request['responseCode'] = raw_request['response']['status']
