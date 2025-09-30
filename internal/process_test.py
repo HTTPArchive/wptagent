@@ -221,6 +221,8 @@ class ProcessTest(object):
                                         value = int(value)
                                     elif re.match(r'^[0-9]*\.[0-9]+$', value):
                                         value = float(value)
+                                    else:
+                                        value = value.strip()
                                 if name == 'test_result':
                                     # Only use a custom value for a test result if it is explicitly set
                                     if value:
