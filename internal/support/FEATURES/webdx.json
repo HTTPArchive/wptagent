@@ -397,5 +397,17 @@
     "396": "JsonModules",
     "397": "DRAFT_WasmCustomDescriptors",
     "398": "FetchRequestStreams",
-    "399": "TransferableStreams"
+    "399": "TransferableStreams",
+    "400": "ReadableByteStreams",
+    "401": "DevicePosture",
+    "402": "WebxrAnchors",
+    "403": "WebxrAr",
+    "404": "WebxrCamera",
+    "405": "WebxrDepthSensing",
+    "406": "WebxrDomOverlays",
+    "407": "WebxrHandInput",
+    "408": "WebxrHitTest",
+    "409": "WebxrLightingEstimation",
+    "410": "Reporting",
+    "411": "FontLanguageOverride"
 }
