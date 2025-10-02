@@ -2811,7 +2811,17 @@
       "x-yerdle-app-name": ""
     },
     "icon": "trove.png",
+    "js": {
+      "troveDataLayer": "",
+      "troveGlobal": ""
+    },
     "saas": true,
+    "scriptSrc": [
+      "recurate-slider\\.js",
+      "recurate-core\\.js",
+      "recurate-pdp\\.js",
+      "recurate-page\\.js"
+    ],
     "website": "https://trove.co",
     "xhr": "reware-production\\.yerdlesite\\.com"
   },
@@ -3058,6 +3068,18 @@
     "oss": true,
     "scriptSrc": "turolinks\\.js",
     "website": "https://github.com/turbolinks/turbolinks"
+  },
+  "Turbopack": {
+    "cats": [
+      47
+    ],
+    "description": "Turbopack is an open-source JavaScript module bundler.",
+    "icon": "Turbopack.svg",
+    "js": {
+      "TURBOPACK": ""
+    },
+    "oss": true,
+    "website": "https://nextjs.org/docs/app/api-reference/turbopack"
   },
   "TurfJS": {
     "cats": [

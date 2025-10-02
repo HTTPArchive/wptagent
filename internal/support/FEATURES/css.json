@@ -881,5 +881,9 @@
     "879": "CSSPropertyMasonry",
     "880": "CSSPropertyContinue",
     "881": "CSSPropertyMaxLines",
-    "882": "CSSPropertyBlockEllipsis"
+    "882": "CSSPropertyBlockEllipsis",
+    "883": "CSSPropertyOverscrollArea",
+    "884": "CSSPropertyOverscrollPosition",
+    "885": "CSSPropertyFontLanguageOverride",
+    "886": "CSSPropertyRubyOverhang"
 }
