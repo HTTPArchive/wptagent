@@ -70,6 +70,7 @@ def pretty_type(mime_typ, ext):
         "svg",
         "ico",
         "bmp",
+        "tiff",
         "avif",
         "jxl",
         "heic",
@@ -98,6 +99,8 @@ def pretty_type(mime_typ, ext):
 
 
 def get_format(pretty_typ, mime_typ, ext):
+    mime_typ = mime_typ.lower()
+    
     if "image" == pretty_typ:
         # Test mime_typ first, as "better" type can be
         # returned with same extension
@@ -130,6 +133,7 @@ def get_format(pretty_typ, mime_typ, ext):
             "svg",
             "ico",
             "bmp",
+            "tiff",
             "avif",
             "jxl",
             "heic",
