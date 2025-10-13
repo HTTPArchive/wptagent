@@ -81,7 +81,7 @@ def pretty_type(mime_typ, ext):
         return "xml"
     # Video extensions mp4, webm, ts, m4v, m4s, m4v, mov, ogv
     elif next(
-        (typ for typ in ["flash", "webm", "mp4", "flv"] if typ in mime_typ), None
+        (typ for typ in ["flash", "webm", "mp4", "flv", "mp2t", "m2ts", "quicktime"] if typ in mime_typ), None
     ) or ext in ["mp4", "webm", "ts", "m4v", "m4s", "mov", "ogv", "swf", "f4v", "flv"]:
         return "video"
     elif "wasm" in mime_typ or ext == "wasm":
@@ -98,6 +98,8 @@ def pretty_type(mime_typ, ext):
 
 def get_format(pretty_typ, mime_typ, ext):
     if "image" == pretty_typ:
+        # Test mime_type first, as "better" type can be
+        # returned with same extension
         # Order by most popular first.
         for typ in [
             "jpg",
@@ -106,19 +108,50 @@ def get_format(pretty_typ, mime_typ, ext):
             "webp",
             "svg",
             "ico",
+            "bmp",
             "avif",
             "jxl",
             "heic",
             "heif",
         ]:
-            if typ in mime_typ or typ == ext:
+            if typ in mime_typ:
                 return typ
-        if "jpeg" in mime_typ or ext = "jpeg":  # pragma: no branch
+        # JPEG needs special attention as want it to be jpg
+        if "jpeg" in mime_typ:  # pragma: no branch
+            return "jpg"
+        # Fallback to extension only if no mime_type
+        # or mime_type is set to generic "octet-stream" type
+        for typ in [
+            "jpg",
+            "png",
+            "gif",
+            "webp",
+            "svg",
+            "ico",
+            "bmp",
+            "avif",
+            "jxl",
+            "heic",
+            "heif",
+        ]:
+            if (mime_typ == "" or "octet-stream" in mime_type) and typ == ext:
+                return typ
+        # JPEG needs special attention as want it to be jpg
+        if (mime_typ == "" or "octet-stream" in mime_type) and ext = "jpeg":  # pragma: no branch
             return "jpg"
     if "video" == pretty_typ:
         # Order by most popular first.
-        for typ in ["flash", "swf", "mp4", "flv", "f4v"]:  # pragma: no branch
-            if typ in mime_typ or typ == ext:
+        # Test mime_type first, as "better" type can be
+        # returned with same extension
+        for typ in ["swf", "mp4", "flv", "f4v", "mov", "ogv", "mp2t"]:  # pragma: no branch
+            if typ in mime_typ
+                return typ
+        if "flash" in mime_type:  # pragma: no branch
+            return "swf"
+        # Fallback to extension only if no mime_type
+        # or mime_type is set to generic "octet-stream" type
+        for typ in ["swf", "mp4", "flv", "f4v", "mov", "ogv"]:  # pragma: no branch
+            if (mime_typ == "" or "octet-stream" in mime_type) and typ == ext:
                 return typ
     return ""
 
