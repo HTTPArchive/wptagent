@@ -113,7 +113,7 @@ def get_format(pretty_typ, mime_typ, ext):
         ]:
             if typ in mime_typ or typ == ext:
                 return typ
-        if "jpeg" in mime_typ:  # pragma: no branch
+        if "jpeg" in mime_typ or ext = "jpeg":  # pragma: no branch
             return "jpg"
     if "video" == pretty_typ:
         # Order by most popular first.
