@@ -149,7 +149,7 @@ def get_format(pretty_typ, mime_typ, ext):
         # Test mime_typ first, as "better" type can be
         # returned with same extension
         for typ in ["swf", "mp4", "flv", "f4v", "mov", "ogv", "mp2t"]:  # pragma: no branch
-            if typ in mime_typ
+            if typ in mime_typ:
                 return typ
         if "flash" in mime_typ:  # pragma: no branch
             return "swf"
