@@ -142,7 +142,7 @@ def get_format(pretty_typ, mime_typ, ext):
             if (mime_typ == "" or "octet-stream" in mime_typ) and typ == ext:
                 return typ
         # JPEG needs special attention as want it to be jpg
-        if (mime_typ == "" or "octet-stream" in mime_typ) and ext = "jpeg":  # pragma: no branch
+        if (mime_typ == "" or "octet-stream" in mime_typ) and ext == "jpeg":  # pragma: no branch
             return "jpg"
     if "video" == pretty_typ:
         # Order by most popular first.
