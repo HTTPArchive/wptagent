@@ -885,5 +885,17 @@
     "883": "CSSPropertyOverscrollArea",
     "884": "CSSPropertyOverscrollPosition",
     "885": "CSSPropertyFontLanguageOverride",
-    "886": "CSSPropertyRubyOverhang"
+    "886": "CSSPropertyRubyOverhang",
+    "887": "CSSPropertyRuleBreak",
+    "888": "CSSPropertyRuleOutset",
+    "889": "CSSPropertyColumnRuleVisibilityItems",
+    "890": "CSSPropertyRowRuleVisibilityItems",
+    "891": "CSSPropertyColumnRuleEdgeStartOutset",
+    "892": "CSSPropertyColumnRuleEdgeEndOutset",
+    "893": "CSSPropertyColumnRuleInteriorStartOutset",
+    "894": "CSSPropertyColumnRuleInteriorEndOutset",
+    "895": "CSSPropertyRowRuleEdgeStartOutset",
+    "896": "CSSPropertyRowRuleEdgeEndOutset",
+    "897": "CSSPropertyRowRuleInteriorStartOutset",
+    "898": "CSSPropertyRowRuleInteriorEndOutset"
 }
