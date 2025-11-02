@@ -409,5 +409,8 @@
     "408": "WebxrHitTest",
     "409": "WebxrLightingEstimation",
     "410": "Reporting",
-    "411": "FontLanguageOverride"
+    "411": "FontLanguageOverride",
+    "412": "Webnn",
+    "413": "TextDetect",
+    "414": "TextJustify"
 }
