@@ -897,5 +897,7 @@
     "895": "CSSPropertyRowRuleEdgeStartOutset",
     "896": "CSSPropertyRowRuleEdgeEndOutset",
     "897": "CSSPropertyRowRuleInteriorStartOutset",
-    "898": "CSSPropertyRowRuleInteriorEndOutset"
+    "898": "CSSPropertyRowRuleInteriorEndOutset",
+    "899": "CSSPropertyTimelineTriggerRange",
+    "900": "CSSPropertyTimelineTriggerExitRange"
 }
