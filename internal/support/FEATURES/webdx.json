@@ -412,5 +412,7 @@
     "411": "FontLanguageOverride",
     "412": "Webnn",
     "413": "TextDetect",
-    "414": "TextJustify"
+    "414": "TextJustify",
+    "415": "Summarizer",
+    "416": "TranslationApi"
 }

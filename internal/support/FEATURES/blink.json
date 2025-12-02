@@ -5340,5 +5340,19 @@
     "5715": "AnimationCompositedTypes",
     "5716": "AnimationSvgNonCompositedTypes",
     "5717": "AnimationSvgCompositedTypes",
-    "5718": "AttributionReportingXhr"
+    "5718": "AttributionReportingXhr",
+    "5719": "DidUseServerHttpAuthOnCrossPartitionRequest",
+    "5720": "LcpCandidateRemovedWhilePaintTimePending",
+    "5721": "GetBBoxForElementWithZeroWidthOrHeight",
+    "5722": "GetBBoxForNestedSVGElementWithZeroWidthOrHeight",
+    "5723": "XMLExternalResourceLoadEntitiesOnly",
+    "5724": "V8Origin_IsSameOrigin_Method",
+    "5725": "V8Origin_IsSameSite_Method",
+    "5726": "V8Origin_From_Method",
+    "5727": "V8Origin_FromURL_Method",
+    "5728": "V8Origin_Parse_Method",
+    "5729": "ExtendedTextMetrics",
+    "5730": "UseCssSizingProperties",
+    "5731": "SharedStorageAPIAll",
+    "5732": "GamepadRawInputChangeEventListener"
 }
