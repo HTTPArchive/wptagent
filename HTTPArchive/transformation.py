@@ -303,11 +303,13 @@ class HarJsonToSummary:
             # This is the first URL found associated with the page - assume it's the base URL.
             first_req = True
             first_url = url
+        ret_request.update({"firstReq": first_req})
 
         if not first_html_url:
             # This is the first URL found associated with the page that's HTML.
             first_html = True
             first_html_url = url
+        ret_request.update({"firstHtml": first_html})
 
         return ret_request, first_url, first_html_url, entry_number
 
