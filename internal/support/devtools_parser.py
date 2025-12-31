@@ -883,6 +883,7 @@ class DevToolsParser(object):
                    'dns_start': 'dns_start',
                    'dns_end': 'dns_end',
                    'dns_info': 'dns_info',
+                   'dns_details': 'dns_details',
                    'connect_start': 'connect_start',
                    'connect_end': 'connect_end',
                    'ssl_start': 'ssl_start',

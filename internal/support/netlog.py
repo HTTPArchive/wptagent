@@ -406,6 +406,13 @@ class Netlog():
                                             request['dns_start'] = dns['start']
                                             request['dns_end'] = dns['end']
 
+                # Add the DNS lookup metadata to all of the requests
+                if 'dns_info' in self.netlog:
+                    for request in requests or []:
+                        hostname = urlparse(request['url']).hostname
+                        if hostname in self.netlog['dns_info']:
+                            request['dns_details'] = self.netlog['dns_info'][hostname]
+
                 # Find the start timestamp if we didn't have one already
                 times = ['dns_start', 'dns_end',
                          'connect_start', 'connect_end',
@@ -772,6 +779,48 @@ class Netlog():
                 entry['info'] = {}
             entry['info'].update(params)
             updated = True
+        if name == 'HOST_RESOLVER_DNS_TASK_EXTRACTION_RESULTS' and 'results' in params:
+            # take the domain_name of the first result as the root domain being resolved
+            dns_info = None
+            for result in params['results']:
+                if dns_info is None and 'domain_name' in result:
+                    domain_name = result['domain_name']
+                    if 'dns_info' not in self.netlog:
+                        self.netlog['dns_info'] = {}
+                    if domain_name not in self.netlog['dns_info']:
+                        self.netlog['dns_info'][domain_name] = {}
+                    dns_info = self.netlog['dns_info'][domain_name]
+                if 'query_type' in result:
+                    query_type = result['query_type']
+                    if query_type not in dns_info:
+                        dns_info[query_type] = {}
+                    response = dns_info[query_type]
+                    if 'alias_target' in result:
+                        if 'cname' not in response:
+                            response['cname'] = []
+                        if result['alias_target'] not in response['cname']:
+                            response['cname'].append(result['alias_target'])
+                    if 'endpoints' in result:
+                        if 'addr' not in response:
+                            response['addr'] = []
+                        for endpoint in result['endpoints']:
+                            if 'address' in endpoint and endpoint['address'] not in response['addr']:
+                                response['addr'].append(endpoint['address'])
+                    if 'error' in result:
+                        response['error'] = result['error']
+                    if query_type == 'HTTPS' and 'metadatas' in result:
+                        for metadata in result['metadatas']:
+                            if'metadata_value' in metadata:
+                                value = metadata['metadata_value']
+                                if 'ech_config_list' in value:
+                                    response['ech'] = value['ech_config_list']
+                                if 'supported_protocol_alpns' in value:
+                                    if 'alpn' not in response:
+                                        response['alpn'] = []
+                                    for alpn in  value['supported_protocol_alpns']:
+                                        if alpn not in response['alpn']:
+                                            response['alpn'].append(alpn)
+
         # Send the updated DNS entry info to the caller in realtime
         if updated and self.on_update_dns_lookup is not None:
             try:
