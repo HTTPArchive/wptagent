@@ -414,5 +414,7 @@
     "413": "TextDetect",
     "414": "TextJustify",
     "415": "Summarizer",
-    "416": "TranslationApi"
+    "416": "TranslationApi",
+    "417": "DRAFT_MetaTextScale",
+    "418": "Jpegxl"
 }

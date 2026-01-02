@@ -899,5 +899,14 @@
     "897": "CSSPropertyRowRuleInteriorStartOutset",
     "898": "CSSPropertyRowRuleInteriorEndOutset",
     "899": "CSSPropertyTimelineTriggerRange",
-    "900": "CSSPropertyTimelineTriggerExitRange"
+    "900": "CSSPropertyTimelineTriggerExitRange",
+    "901": "CSSPropertyTriggerScope",
+    "902": "CSSPropertyProtocol",
+    "903": "CSSPropertyHostname",
+    "904": "CSSPropertyPort",
+    "905": "CSSPropertyPathname",
+    "906": "CSSPropertySearch",
+    "907": "CSSPropertyHash",
+    "908": "CSSPropertyBaseUrl",
+    "909": "CSSPropertyPattern"
 }
