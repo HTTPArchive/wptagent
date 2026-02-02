@@ -908,5 +908,21 @@
     "906": "CSSPropertySearch",
     "907": "CSSPropertyHash",
     "908": "CSSPropertyBaseUrl",
-    "909": "CSSPropertyPattern"
+    "909": "CSSPropertyPattern",
+    "910": "CSSPropertyColumnRuleEdgeInset",
+    "911": "CSSPropertyRowRuleEdgeInset",
+    "912": "CSSPropertyColumnRuleInteriorInset",
+    "913": "CSSPropertyRowRuleInteriorInset",
+    "914": "CSSPropertyRuleEdgeInset",
+    "915": "CSSPropertyRuleInteriorInset",
+    "916": "CSSPropertyPageMarginSafety",
+    "917": "CSSPropertyTimelineTriggerEntryRangeStart",
+    "918": "CSSPropertyTimelineTriggerEntryRangeEnd",
+    "919": "CSSPropertyTimelineTriggerActiveRangeStart",
+    "920": "CSSPropertyTimelineTriggerActiveRangeEnd",
+    "921": "CSSPropertyTimelineTriggerEntryRange",
+    "922": "CSSPropertyTimelineTriggerActiveRange",
+    "923": "CSSPropertyGridLanesPack",
+    "924": "CSSPropertyTextFit",
+    "925": "CSSPropertyViewTransitionScope"
 }

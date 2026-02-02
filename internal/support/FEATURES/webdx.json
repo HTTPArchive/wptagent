@@ -416,5 +416,10 @@
     "415": "Summarizer",
     "416": "TranslationApi",
     "417": "DRAFT_MetaTextScale",
-    "418": "Jpegxl"
+    "418": "Jpegxl",
+    "419": "PartitionedCookies",
+    "420": "Prompt",
+    "421": "Proofreader",
+    "422": "Rewriter",
+    "423": "Writer"
 }

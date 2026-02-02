@@ -5394,5 +5394,14 @@
     "5769": "DigitalCredentialsProtocolOpenId4Vci",
     "5770": "DigitalCredentialsProtocolUnknown",
     "5771": "SetCookieWithEmptyName",
-    "5772": "SetCookieWithEmptyNameAndAmbiguousValue"
+    "5772": "SetCookieWithEmptyNameAndAmbiguousValue",
+    "5773": "StorageAccessAPI_requestStorageAccessFor_Method_AsyncSuccess",
+    "5774": "WebAudioRenderSizeHint",
+    "5775": "WebAudioRenderQuantumSize",
+    "5776": "ImageElementTimingNotImageOrVideoNode",
+    "5777": "XSLPIInSVGImage",
+    "5778": "XSLPIInSVGStandaloneDoc",
+    "5779": "AudioContextAsyncStateTransitions",
+    "5780": "AudioContextAsyncTransitionToRunningStateRead",
+    "5781": "AudioContextAsyncTransitionToSuspendedStateRead"
 }
