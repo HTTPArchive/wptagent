@@ -824,7 +824,7 @@ class DevTools(object):
                         if content_type.startswith('text/') or \
                                 content_type.find('javascript') >= 0 or \
                                 content_type.find('json') >= 0 or \
-                                content_type.find('/svg+xml'):
+                                content_type.find('/svg+xml') >= 0:
                             is_text = True
                 if response is None:
                     self.body_fail_count += 1
@@ -855,8 +855,16 @@ class DevTools(object):
             if body is not None and not os.path.exists(body_file_path):
                 if 'request_headers' in request:
                     fetch_dest = self.get_header_value(request['request_headers'], 'Sec-Fetch-Dest')
-                    if fetch_dest is not None and fetch_dest in ['audio', 'audioworklet', 'font', 'image', 'object', 'track', 'video']:
+                    if fetch_dest is not None and fetch_dest in ['audio', 'audioworklet', 'font', 'object', 'track', 'video']:
                         is_text = False
+                    elif fetch_dest == 'image':
+                        content_type = self.get_header_value(request['response_headers'], 'Content-Type')
+                        if content_type is not None:
+                            content_type = content_type.lower()
+                            if content_type.find('/svg+xml') == -1:
+                                is_text = False
+                        else:
+                            is_text = False
                 # Add text bodies to the zip archive
                 store_body = self.all_bodies
                 if self.html_body and request_id == self.main_request:
