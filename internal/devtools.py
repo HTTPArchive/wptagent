@@ -855,16 +855,14 @@ class DevTools(object):
             if body is not None and not os.path.exists(body_file_path):
                 if 'request_headers' in request:
                     fetch_dest = self.get_header_value(request['request_headers'], 'Sec-Fetch-Dest')
-                    if fetch_dest is not None and fetch_dest in ['audio', 'audioworklet', 'font', 'object', 'track', 'video']:
+                    if fetch_dest is not None and fetch_dest in ['audio', 'audioworklet', 'font', 'image', 'object', 'track', 'video']:
                         is_text = False
-                    elif fetch_dest == 'image':
-                        content_type = self.get_header_value(request['response_headers'], 'Content-Type')
-                        if content_type is not None:
-                            content_type = content_type.lower()
-                            if content_type.find('/svg+xml') == -1:
-                                is_text = False
-                        else:
-                            is_text = False
+                # special-case svg images by sniffing the beginning of the file
+                try:
+                    if body.startswith(b'<?xml '):
+                        is_text = True
+                except Exception:
+                    pass
                 # Add text bodies to the zip archive
                 store_body = self.all_bodies
                 if self.html_body and request_id == self.main_request:
