@@ -924,5 +924,19 @@
     "922": "CSSPropertyTimelineTriggerActiveRange",
     "923": "CSSPropertyGridLanesPack",
     "924": "CSSPropertyTextFit",
-    "925": "CSSPropertyViewTransitionScope"
+    "925": "CSSPropertyViewTransitionScope",
+    "926": "CSSPropertyRuleVisibilityItems",
+    "927": "CSSPropertyFrameSizing",
+    "928": "CSSPropertyImageAnimation",
+    "929": "CSSPropertyMarginTrim",
+    "930": "CSSPropertyTimelineTriggerActivationRangeStart",
+    "931": "CSSPropertyTimelineTriggerActivationRangeEnd",
+    "932": "CSSPropertyTimelineTriggerActivationRange",
+    "933": "CSSPropertyRuleOverlap",
+    "934": "CSSPropertyColumnRuleInsetStart",
+    "935": "CSSPropertyColumnRuleInsetEnd",
+    "936": "CSSPropertyRowRuleInsetStart",
+    "937": "CSSPropertyRowRuleInsetEnd",
+    "938": "CSSPropertyRuleInsetStart",
+    "939": "CSSPropertyRuleInsetEnd"
 }
