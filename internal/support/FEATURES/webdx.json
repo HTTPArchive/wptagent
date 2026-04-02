@@ -428,5 +428,9 @@
     "427": "DRAFT_WebMCP",
     "428": "DRAFT_LoadingLazyMedia",
     "429": "ManifestLocalization",
-    "430": "ContrastColor"
+    "430": "ContrastColor",
+    "431": "DRAFT_WebAppMigration",
+    "432": "DeclarativeWebmcp",
+    "433": "Webgl",
+    "434": "Webgl2"
 }

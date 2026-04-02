@@ -938,5 +938,6 @@
     "936": "CSSPropertyRowRuleInsetStart",
     "937": "CSSPropertyRowRuleInsetEnd",
     "938": "CSSPropertyRuleInsetStart",
-    "939": "CSSPropertyRuleInsetEnd"
+    "939": "CSSPropertyRuleInsetEnd",
+    "940": "CSSPropertyPathLength"
 }
