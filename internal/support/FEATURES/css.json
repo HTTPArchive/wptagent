@@ -939,5 +939,8 @@
     "937": "CSSPropertyRowRuleInsetEnd",
     "938": "CSSPropertyRuleInsetStart",
     "939": "CSSPropertyRuleInsetEnd",
-    "940": "CSSPropertyPathLength"
+    "940": "CSSPropertyPathLength",
+    "941": "CSSPropertyHangingPunctuation",
+    "942": "CSSPropertyFlexLineCount",
+    "943": "CSSPropertyTextDecorationSkipSpaces"
 }
