@@ -5507,5 +5507,22 @@
     "5883": "CSSURLRequestModifierReferrerPolicy",
     "5884": "PreventSvgFilterPaint",
     "5885": "LanguageModel_Prompt_ResponseConstraint",
-    "5886": "LanguageModel_Prompt_Prefix"
+    "5886": "LanguageModel_Prompt_Prefix",
+    "5887": "CapabilityElementIsValid",
+    "5888": "CapabilityElementInvalidReason",
+    "5889": "CapabilityElementInitialPermissionStatus",
+    "5890": "CapabilityElementPermissionStatus",
+    "5891": "CapabilityElementOnPromptAction",
+    "5892": "CapabilityElementOnPromptDismiss",
+    "5893": "CapabilityElementOnValidationStatusChange",
+    "5894": "InputParsedParentSelectNoOptions",
+    "5895": "FocusGroupStart",
+    "5896": "WebAuthenticationRemoteCspDisallowsRpId",
+    "5897": "SpeculationMeasurement",
+    "5898": "CryptoAlgorithmMlKem768X25519",
+    "5899": "GeolocationAccuracyModeApproximate",
+    "5900": "SVGAnimVal",
+    "5901": "SubtleCryptoGetPublicKey",
+    "5902": "CapabilityDelegationOfDigitalCredentialsCreate",
+    "5903": "CapabilityDelegationOfDigitalCredentialsGet"
 }

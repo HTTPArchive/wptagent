@@ -433,5 +433,9 @@
     "432": "DeclarativeWebmcp",
     "433": "Webgl",
     "434": "Webgl2",
-    "435": "DigitalCredentials"
+    "435": "DigitalCredentials",
+    "436": "MediaPseudos",
+    "437": "GapDecorations",
+    "438": "FlexWrapBalance",
+    "439": "TextFit"
 }
