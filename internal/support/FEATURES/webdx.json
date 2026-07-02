@@ -437,5 +437,10 @@
     "436": "MediaPseudos",
     "437": "GapDecorations",
     "438": "FlexWrapBalance",
-    "439": "TextFit"
+    "439": "TextFit",
+    "440": "TextModules",
+    "441": "DRAFT_TemplateFor",
+    "442": "DRAFT_HTMLProcessingInstructions",
+    "443": "DRAFT_HTMLSetterMethods",
+    "444": "DRAFT_HTMLStreamMethods"
 }
