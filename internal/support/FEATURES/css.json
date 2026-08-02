@@ -960,5 +960,6 @@
     "958": "CSSPropertyCornerBlockStart",
     "959": "CSSPropertyCornerBlockEnd",
     "960": "CSSPropertyCornerInlineStart",
-    "961": "CSSPropertyCornerInlineEnd"
+    "961": "CSSPropertyCornerInlineEnd",
+    "962": "CSSPropertyWindowDrag"
 }
