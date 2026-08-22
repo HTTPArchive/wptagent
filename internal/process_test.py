@@ -52,7 +52,7 @@ class ProcessTest(object):
                 self.data = None
                 self.delete = []
                 self.run_processing()
-
+    
     def run_processing(self):
         """Run the post-processing for the given test step"""
         self.load_data()
@@ -78,7 +78,7 @@ class ProcessTest(object):
         # Mark the job as successful if any of the steps were successful
         if 'result' in page_data and page_data['result'] in [0, 99997, 99998, 99999]:
             self.job['success'] = True
-
+        
         # Extract any metrics requested for "successful" pubsub messages
         try:
             if 'pubsub_completed_metrics' in self.job and len(self.job['pubsub_completed_metrics']):
@@ -322,7 +322,7 @@ class ProcessTest(object):
                                     start_time = event['startTime']
                             except Exception:
                                 pass
-
+                        
                         # Make a pass looking for explicitly tagged main frames
                         main_frames = []
                         for event in events:
@@ -448,7 +448,7 @@ class ProcessTest(object):
                                                     first_shift = time
                                                     curr = 0
                                                     shift_window_count += 1
-
+                                                
                                                 prev_shift = time
                                                 curr += event['args']['data']['score']
                                                 max_layout_window = max(curr, max_layout_window)
@@ -482,7 +482,7 @@ class ProcessTest(object):
                                     user_timing.append({'name': event['name'], 'time': event['time']})
                                 except Exception:
                                     logging.exception('Error processing largest events')
-
+                            
                             try:
                                 if 'LargestContentfulPaint' in largest:
                                     event = largest['LargestContentfulPaint']
@@ -644,7 +644,7 @@ class ProcessTest(object):
                             last_interactive = max(window[0], start_time)
 
                     # Start by filtering the interactive windows to only include 5 second windows that don't
-                    # end before the start time.
+                    # end before the start time.                
                     end = 0
                     iw = []
                     for window in interactive_periods:
@@ -654,7 +654,7 @@ class ProcessTest(object):
                             iw.append(window)
                             if first_interactive is None or window[0] < first_interactive:
                                 first_interactive = max(window[0], start_time)
-
+                    
                     # Find all of the request windows with 5 seconds of no more than 2 concurrent document requests
                     rw = []
                     requests = self.data['requests']
@@ -668,7 +668,7 @@ class ProcessTest(object):
                                 if 'method' not in request or request['method'] == 'GET':
                                     req.append({'type': 'start', 'time': request['load_start']})
                                     req.append({'type': 'end', 'time': request['load_end']})
-
+                    
                         # walk the list of events tracking the number of in-flight requests and log any windows > 5 seconds
                         if req:
                             req.sort(key=lambda x: x['time'])
@@ -688,7 +688,7 @@ class ProcessTest(object):
                                         window_start = e['time']
                             if window_start is not None and end - window_start >= 5000:
                                 rw.append([window_start, end])
-
+                    
                     # Find the first interactive window that also has at least a 5 second intersection with one of the request windows
                     if rw:
                         window = None
@@ -702,7 +702,7 @@ class ProcessTest(object):
                                             break
                         if window is not None:
                             tti = max(start_time, window[0])
-
+                    
                     # Calculate the total blocking time - https://web.dev/tbt/
                     # and the max possible FID (longest task)
                     end_time = tti if tti is not None else last_interactive
@@ -718,7 +718,7 @@ class ProcessTest(object):
                                     total_blocking_time += busy_time
                                     if busy_time > max_fid:
                                         max_fid = busy_time
-
+                    
                     # DOM Content loaded is the floor for any possible TTI times
                     if dcl is not None:
                         if tti is not None and tti > 0 and dcl > tti:
@@ -762,7 +762,7 @@ class ProcessTest(object):
                 page_data['loadTime'] = page_data['visualComplete']
                 page_data['docTime'] = page_data['visualComplete']
                 page_data['fullyLoaded'] = page_data['lastVisualChange']
-
+            
             # See if we have pcap-based versions of the various metrics
             if ('bytesIn' not in page_data or page_data['bytesIn'] <= 0) and 'pcapBytesIn' in page_data and page_data['pcapBytesIn'] > 0:
                 page_data['bytesIn'] = page_data['pcapBytesIn']
@@ -772,7 +772,7 @@ class ProcessTest(object):
                 page_data['bytesOut'] = page_data['pcapBytesOut']
             if ('bytesOutDoc' not in page_data or page_data['bytesOutDoc'] <= 0) and 'pcapBytesOut' in page_data and page_data['pcapBytesOut'] > 0:
                 page_data['bytesOutDoc'] = page_data['pcapBytesOut']
-
+            
             # Basic run information
             page_data['testID'] = self.task['id']
             page_data['run'] = self.task['run']
@@ -1012,7 +1012,7 @@ class ProcessTest(object):
             har_file = os.path.join(self.task['dir'], self.prefix + '_har.json.gz')
             with gzip.open(har_file, GZIP_TEXT, 7) as f:
                 json.dump(har, f)
-
+            
             # Upload the HAR to GCS for "successful" tests
             uploaded = False
             har_filename = os.path.basename(har_file)
@@ -1043,13 +1043,13 @@ class ProcessTest(object):
                     logging.exception('Error uploading HAR to Cloud Storage')
             else:
                 logging.debug("Not uploading HAR")
-
+            
             if uploaded:
                 if self.job['success'] and 'bq_datastore' in self.job:
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
                 elif 'bq_datastore_failures' in self.job:
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
-
+            
             # Delete the local HAR file if it was only supposed to be uploaded
             if not self.options.har:
                 os.unlink(har_file)
@@ -1060,7 +1060,7 @@ class ProcessTest(object):
     def bigquery_date(self, date_str):
         """ Convert a YYYY-MM-DD date to bigquery epoch DATE """
         from datetime import datetime
-
+        
         date_value = datetime.strptime(date_str, '%Y-%m-%d')
         epoch_value = datetime(1970, 1, 1)
         delta = date_value - epoch_value
@@ -1461,7 +1461,7 @@ class ProcessTest(object):
                 req['httpVersion'] = ver
             else:
                 req['httpVersion'] = ''
-
+            
             req['queryString'] = []
             parsed_url = urlparse(request['full_url'], allow_fragments=False)
             qs = parse_qs(parsed_url.query)
@@ -1469,7 +1469,7 @@ class ProcessTest(object):
                 for name in qs:
                     for val in qs[name]:
                         req['queryString'].append({'name': name, 'value': val})
-
+            
             if 'method' in request and request['method'].lower().strip() == 'post':
                 req['postData'] = {'mimeType': '', 'text': ''}
 
@@ -1552,7 +1552,7 @@ class ProcessTest(object):
             for key in entry['timings']:
                 if key != 'ssl' and entry['timings'][key] > 0:
                     entry['time'] += entry['timings'][key]
-
+            
             # dump all of the data into the request object directly as custom keys
             for key in request:
                 entry["_{}".format(key)] = request[key]
