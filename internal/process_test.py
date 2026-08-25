@@ -1026,17 +1026,18 @@ class ProcessTest(object):
                     needs_upload:
                 try:
                     from google.cloud import storage
+                    from google.api_core.exceptions import PreconditionFailed
                     client = storage.Client()
                     bucket = client.get_bucket(self.job['gcs_har_upload']['bucket'])
                     prefix = '' if self.prefix == '1' else '_' + self.prefix
                     gcs_path = os.path.join(self.job['gcs_har_upload']['path'], self.task['id'] + prefix + '.har.gz')
                     har_filename = gcs_path
                     blob = bucket.blob(gcs_path)
-                    if not blob.exists():
-                        blob.upload_from_filename(filename=har_file)
+                    try:
+                        blob.upload_from_filename(filename=har_file, if_generation_match=0)
                         uploaded = True
                         logging.debug('Uploaded HAR to gs://%s/%s', self.job['gcs_har_upload']['bucket'], gcs_path)
-                    else:
+                    except PreconditionFailed:
                         logging.debug("HAR already exists, not uploading: gs://%s/%s", self.job['gcs_har_upload']['bucket'], gcs_path)
                 except Exception:
                     logging.exception('Error uploading HAR to Cloud Storage')
