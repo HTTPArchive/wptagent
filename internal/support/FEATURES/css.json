@@ -961,5 +961,8 @@
     "959": "CSSPropertyCornerBlockEnd",
     "960": "CSSPropertyCornerInlineStart",
     "961": "CSSPropertyCornerInlineEnd",
-    "962": "CSSPropertyWindowDrag"
+    "962": "CSSPropertyWindowDrag",
+    "963": "CSSPropertyMaxContentSizing",
+    "964": "CSSPropertyTextDecorationInset",
+    "965": "CSSPropertyOverscrollContainerType"
 }

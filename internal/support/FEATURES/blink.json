@@ -5603,5 +5603,21 @@
     "5979": "UAReplaceStartAddListener",
     "5980": "UAReplaceEndAddListener",
     "5981": "AdImageHDR",
-    "5982": "AdVideoHDR"
+    "5982": "AdVideoHDR",
+    "5983": "LocalNetworkAccessShouldTreatAsPublicAddressCsp",
+    "5984": "CreateBytesModuleScript",
+    "5985": "V8ModuleNamespaceMissingDefaultWithStarExport",
+    "5986": "V8WasmGCAllocation",
+    "5987": "OffscreenCanvasTransferToWorker",
+    "5988": "DeclarativeShadowDomRejectedByNormalParser",
+    "5989": "DeclarativeShadowDomRejectedByFragmentParser",
+    "5990": "PopoverTypeAutoShown",
+    "5991": "PopoverTypeHintShown",
+    "5992": "PopoverTypeManualShown",
+    "5993": "CSSAtPrivate",
+    "5994": "ConnectionAllowlistEmbeddedEnforcement",
+    "5995": "ConnectionAllowlistEmbeddedEnforcementAllowedByOptIn",
+    "5996": "ConnectionAllowlistEmbeddedEnforcementAllowedByDeliveredAllowlist",
+    "5997": "ConnectionAllowlistEmbeddedEnforcementBlocked",
+    "5998": "WebTransportDatagramDuplexStreamCreateWritable"
 }
