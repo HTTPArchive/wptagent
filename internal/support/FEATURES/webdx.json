@@ -444,5 +444,9 @@
     "443": "DRAFT_HTMLSetterMethods",
     "444": "DRAFT_HTMLStreamMethods",
     "445": "CanvasHtml",
-    "446": "DRAFT_Symbols"
+    "446": "DRAFT_Symbols",
+    "447": "JSSelfProfilingMarkers",
+    "448": "DRAFT_Haptics",
+    "449": "LargestContentfulPaint",
+    "450": "EventTiming"
 }
