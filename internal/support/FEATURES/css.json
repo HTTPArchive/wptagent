@@ -964,5 +964,6 @@
     "962": "CSSPropertyWindowDrag",
     "963": "CSSPropertyMaxContentSizing",
     "964": "CSSPropertyTextDecorationInset",
-    "965": "CSSPropertyOverscrollContainerType"
+    "965": "CSSPropertyOverscrollContainerType",
+    "966": "CSSPropertyLinkParameters"
 }

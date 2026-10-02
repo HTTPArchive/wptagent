@@ -448,5 +448,11 @@
     "447": "JSSelfProfilingMarkers",
     "448": "DRAFT_Haptics",
     "449": "LargestContentfulPaint",
-    "450": "EventTiming"
+    "450": "EventTiming",
+    "451": "SoftNavigations",
+    "452": "InteractionContentfulPaint",
+    "453": "ElementTiming",
+    "454": "ContainerTiming",
+    "455": "SameSiteCookieInclusionChangedByCrossSiteRedirectNoInitiator",
+    "456": "DRAFT_GeolocationAccuracyModeApproximate"
 }
