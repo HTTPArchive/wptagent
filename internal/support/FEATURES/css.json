@@ -965,5 +965,13 @@
     "963": "CSSPropertyMaxContentSizing",
     "964": "CSSPropertyTextDecorationInset",
     "965": "CSSPropertyOverscrollContainerType",
-    "966": "CSSPropertyLinkParameters"
+    "966": "CSSPropertyLinkParameters",
+    "967": "CSSPropertyBorderBlockEndRadius",
+    "968": "CSSPropertyBorderBlockStartRadius",
+    "969": "CSSPropertyBorderInlineEndRadius",
+    "970": "CSSPropertyBorderInlineStartRadius",
+    "971": "CSSPropertyBorderBottomRadius",
+    "972": "CSSPropertyBorderLeftRadius",
+    "973": "CSSPropertyBorderRightRadius",
+    "974": "CSSPropertyBorderTopRadius"
 }
