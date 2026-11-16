@@ -105,7 +105,7 @@ class ProcessTest(object):
         self.save_data()
 
         logging.debug("Preparing to generate HAR")
-        if self.options.har or 'gcs_har_upload' in self.job:
+        if self.options.har or 'gcs_har_upload' in self.job or 'bq_datastore' in self.job or 'bq_datastore_failures' in self.job:
             self.generate_har()
 
         # TODO: Delete any stand-alone files that were post-processed (keep them as backup for now)
@@ -1008,50 +1008,52 @@ class ProcessTest(object):
                 for request in self.data['requests']:
                     har['log']['entries'].append(self.process_har_request(pd, request))
 
-            # Write out the HAR file
+            # Upload the HAR to GCS for "successful" tests (unless upload is disabled)
+            gcs_har_cfg = self.job.get('gcs_har_upload') or {}
+            should_gcs_upload = (
+                'bucket' in gcs_har_cfg
+                and 'path' in gcs_har_cfg
+                and gcs_har_cfg.get('upload', True)
+            )
             har_file = os.path.join(self.task['dir'], self.prefix + '_har.json.gz')
-            with gzip.open(har_file, GZIP_TEXT, 7) as f:
-                json.dump(har, f)
-            
-            # Upload the HAR to GCS for "successful" tests
+            if self.options.har or should_gcs_upload:
+                with gzip.open(har_file, GZIP_TEXT, 7) as f:
+                    json.dump(har, f)
+
             uploaded = False
-            har_filename = os.path.basename(har_file)
+            prefix = '' if self.prefix == '1' else '_' + self.prefix
+            har_filename = os.path.join(gcs_har_cfg['path'], self.task['id'] + prefix + '.har.gz') if 'path' in gcs_har_cfg else os.path.basename(har_file)
             needs_upload = self.job['success']
             if not needs_upload and 'metadata' in self.job and 'retry_count' in self.job['metadata'] and self.job['metadata']['retry_count'] >= 2:
                 needs_upload = True
-            if 'gcs_har_upload' in self.job and \
-                    'bucket' in self.job['gcs_har_upload'] and \
-                    'path' in self.job['gcs_har_upload'] and \
-                    os.path.exists(har_file) and \
-                    needs_upload:
+            if should_gcs_upload and os.path.exists(har_file) and needs_upload:
                 try:
                     from google.cloud import storage
                     from google.api_core.exceptions import PreconditionFailed
                     client = storage.Client()
-                    bucket = client.get_bucket(self.job['gcs_har_upload']['bucket'])
-                    prefix = '' if self.prefix == '1' else '_' + self.prefix
-                    gcs_path = os.path.join(self.job['gcs_har_upload']['path'], self.task['id'] + prefix + '.har.gz')
-                    har_filename = gcs_path
-                    blob = bucket.blob(gcs_path)
+                    bucket = client.get_bucket(gcs_har_cfg['bucket'])
+                    blob = bucket.blob(har_filename)
                     try:
                         blob.upload_from_filename(filename=har_file, if_generation_match=0)
                         uploaded = True
-                        logging.debug('Uploaded HAR to gs://%s/%s', self.job['gcs_har_upload']['bucket'], gcs_path)
+                        logging.debug('Uploaded HAR to gs://%s/%s', gcs_har_cfg['bucket'], har_filename)
                     except PreconditionFailed:
-                        logging.debug("HAR already exists, not uploading: gs://%s/%s", self.job['gcs_har_upload']['bucket'], gcs_path)
+                        logging.debug("HAR already exists, not uploading: gs://%s/%s", gcs_har_cfg['bucket'], har_filename)
                 except Exception:
                     logging.exception('Error uploading HAR to Cloud Storage')
+            elif not should_gcs_upload and needs_upload:
+                uploaded = True
             else:
                 logging.debug("Not uploading HAR")
-            
+
             if uploaded:
                 if self.job['success'] and 'bq_datastore' in self.job:
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
                 elif 'bq_datastore_failures' in self.job:
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
-            
+
             # Delete the local HAR file if it was only supposed to be uploaded
-            if not self.options.har:
+            if not self.options.har and os.path.exists(har_file):
                 os.unlink(har_file)
 
         except Exception:
