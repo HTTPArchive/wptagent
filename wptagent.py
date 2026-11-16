@@ -312,10 +312,7 @@ class WPTAgent(object):
                                 self.job['warmup'] <= 0 and \
                                 (self.task['error'] is None or self.task['soft_error']) and \
                                 'lighthouse' in self.job and self.job['lighthouse']:
-                            if 'page_result' not in self.task or \
-                                    self.task['page_result'] is None or \
-                                    self.task['page_result'] == 0 or \
-                                    self.task['page_result'] == 99999:
+                            if self.should_run_lighthouse(self.task):
                                 self.task['running_lighthouse'] = True
                                 self.wpt.running_another_test(self.task)
                                 self.run_single_test()
@@ -335,6 +332,24 @@ class WPTAgent(object):
                 self.output_test_result()
         except Exception:
             logging.exception('Error running job')
+
+    def should_run_lighthouse(self, task):
+        """Return True only if the initial page load succeeded (including custom test_result)."""
+        page_result = task.get('page_result')
+        if page_result not in (None, 0, 99999):
+            return False
+        if 'dir' in task and 'prefix' in task:
+            metrics_file = os.path.join(task['dir'], task['prefix'] + '_metrics.json.gz')
+            if os.path.isfile(metrics_file):
+                try:
+                    with gzip.open(metrics_file, GZIP_TEXT.replace('w', 'r')) as f_in:
+                        metrics = json.load(f_in)
+                    test_result = metrics.get('test_result') if isinstance(metrics, dict) else None
+                    if test_result not in (None, 0, '0', 99999, '99999', ''):
+                        return False
+                except Exception:
+                    logging.exception('Error checking custom test_result before Lighthouse')
+        return True
 
     def output_test_result(self):
         """Dump the result of a CLI test to stdout"""
