@@ -570,6 +570,9 @@ class WebPageTest(object):
                         self.work_servers_str = job['work_servers']
                         self.work_servers = self.work_servers_str.split(',')
                         logging.debug("Servers changed to: %s", self.work_servers_str)
+                if not self._has_gcs_test_archive(job) and not self._has_wpt_server(job):
+                    job['keep_lighthouse_trace'] = False
+                    job['keep_lighthouse_screenshots'] = False
                 if 'wpthost' in job:
                     self.wpthost = job['wpthost']
                 job['started'] = time.time()
@@ -1414,6 +1417,20 @@ class WebPageTest(object):
             logging.exception('Error backfilling bodies')
         self.profile_end(task, 'wpt.get_bodies')
 
+    def _has_gcs_test_archive(self, job):
+        """Return True if the job is configured to upload result.zip to GCS."""
+        gcs_archive_cfg = job.get('gcs_test_archive') or {}
+        return (
+            'Test ID' in job
+            and 'bucket' in gcs_archive_cfg
+            and 'path' in gcs_archive_cfg
+            and gcs_archive_cfg.get('upload', True)
+        )
+
+    def _has_wpt_server(self, job):
+        """Return True if a WebPageTest server is configured for workdone uploads."""
+        return bool(self.url or 'work_server' in job)
+
     def upload_test_result(self):
         """Upload the full result if the test is not being sharded"""
         if self.is_dead:
@@ -1459,9 +1476,12 @@ class WebPageTest(object):
                     json.dump(self.job['testinfo'], f_out, default=lambda o: '')
                 self.needs_zip.append({'path': json_path, 'name': 'testinfo.json'})
 
-            # Zip the files
+            has_gcs_archive = self._has_gcs_test_archive(self.job)
+            has_wpt_server = self._has_wpt_server(self.job)
+
+            # Zip the files only when uploading to GCS or a WebPageTest server
             zip_path = None
-            if len(self.needs_zip):
+            if len(self.needs_zip) and (has_gcs_archive or has_wpt_server):
                 zip_path = os.path.join(self.workdir, "result.zip")
                 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as zip_file:
                     for zipitem in self.needs_zip:
@@ -1473,10 +1493,7 @@ class WebPageTest(object):
                             pass
             
             # If we are writing the results directly to GCS, don't post to workdone
-            if zip_path is not None and 'Test ID' in self.job and \
-                    'gcs_test_archive' in self.job and \
-                    'bucket' in self.job['gcs_test_archive'] and \
-                    'path' in self.job['gcs_test_archive']:
+            if zip_path is not None and has_gcs_archive:
                 try:
                     from google.cloud import storage
                     client = storage.Client()
@@ -1487,7 +1504,7 @@ class WebPageTest(object):
                     logging.debug('Uploaded test to gs://%s/%s', self.job['gcs_test_archive']['bucket'], gcs_path)
                 except Exception:
                     logging.exception('Error uploading result to Cloud Storage')
-            else:
+            elif has_wpt_server:
                 # Send the result to WebPageTest
                 data = {'location': self.location,
                         'pc': self.pc_name,
