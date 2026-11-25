@@ -563,10 +563,9 @@ class NetEm(object):
                     self.in_interface = 'ifb0'
                 # Set up the ifb interface so inbound traffic can be shaped
                 if self.in_interface.startswith('ifb'):
-                    if self.options.dockerized:
-                        subprocess.call(['sudo', 'ip', 'link', 'add', 'ifb0', 'type', 'ifb'])
-                    else:
+                    if not self.options.dockerized:
                         subprocess.call(['sudo', 'modprobe', 'ifb'])
+                    subprocess.call(['sudo', 'ip', 'link', 'add', 'ifb0', 'type', 'ifb'])
                     subprocess.call(['sudo', 'ip', 'link', 'set', 'dev', 'ifb0', 'up'])
                     subprocess.call(['sudo', 'tc', 'qdisc', 'add', 'dev', self.interface,
                                      'ingress'])
