@@ -1477,6 +1477,8 @@ class WebPageTest(object):
                     'gcs_test_archive' in self.job and \
                     'bucket' in self.job['gcs_test_archive'] and \
                     'path' in self.job['gcs_test_archive']:
+                pass
+                """
                 try:
                     from google.cloud import storage
                     client = storage.Client()
@@ -1487,6 +1489,7 @@ class WebPageTest(object):
                     logging.debug('Uploaded test to gs://%s/%s', self.job['gcs_test_archive']['bucket'], gcs_path)
                 except Exception:
                     logging.exception('Error uploading result to Cloud Storage')
+                """
             else:
                 # Send the result to WebPageTest
                 data = {'location': self.location,
