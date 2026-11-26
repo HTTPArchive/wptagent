@@ -48,6 +48,7 @@ class DevToolsParser(object):
         self.cached = options['cached'] if 'cached' in options else False
         self.noheaders = options['noheaders'] if 'noheaders' in options else False
         self.out_file = options['out']
+        self.gzip_level = options.get('gzip_level', 9)
         self.result = {'pageData': {}, 'requests': []}
         self.request_ids = {}
         self.script_ids = {}
@@ -131,7 +132,7 @@ class DevToolsParser(object):
                 try:
                     _, ext = os.path.splitext(self.out_file)
                     if ext.lower() == '.gz':
-                        with gzip.open(self.out_file, GZIP_TEXT) as f_out:
+                        with gzip.open(self.out_file, GZIP_TEXT, self.gzip_level) as f_out:
                             json.dump(self.result, f_out)
                     else:
                         with open(self.out_file, 'w') as f_out:

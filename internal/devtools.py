@@ -537,7 +537,7 @@ class DevTools(object):
                                         summary[url]['{0}_bytes_used'.format(category)] = used_bytes
                                         summary[url]['{0}_percent_used'.format(category)] = used_pct
                         path = self.path_base + '_coverage.json.gz'
-                        with gzip.open(path, GZIP_TEXT, 7) as f_out:
+                        with gzip.open(path, GZIP_TEXT, self.job.get('gzip_level', 7)) as f_out:
                             json.dump(summary, f_out)
                     self.send_command('CSS.disable', {})
                     self.send_command('DOM.disable', {})
@@ -569,7 +569,7 @@ class DevTools(object):
             self.dev_tools_file = None
         # Save the console logs
         log_file = self.path_base + '_console_log.json.gz'
-        with gzip.open(log_file, GZIP_TEXT, 7) as f_out:
+        with gzip.open(log_file, GZIP_TEXT, self.job.get('gzip_level', 7)) as f_out:
             json.dump(self.console_log, f_out)
         # Save the script sources
         self.send_command('Inspector.disable', {})
@@ -632,7 +632,8 @@ class DevTools(object):
         """Kick off the trace processing asynchronously"""
         if self.trace_enabled and not self.must_exit:
             keep_timeline = True
-            if 'discard_timeline' in self.job and self.job['discard_timeline']:
+            if ('discard_timeline' in self.job and self.job['discard_timeline']) or \
+                    self.job.get('discard_test_archive'):
                 keep_timeline = False
             video_prefix = self.video_prefix if self.recording_video else None
             self.snapshot_dom()
@@ -1918,7 +1919,7 @@ class DevTools(object):
         if self.task['log_data']:
             if self.dev_tools_file is None:
                 path = self.path_base + '_devtools.json.gz'
-                self.dev_tools_file = gzip.open(path, GZIP_TEXT, 7)
+                self.dev_tools_file = gzip.open(path, GZIP_TEXT, self.job.get('gzip_level', 7))
                 self.dev_tools_file.write("[{}")
             if self.dev_tools_file is not None:
                 self.dev_tools_file.write(",\n")
@@ -2199,11 +2200,11 @@ class DevToolsClient(WebSocketClient):
         if 'params' in msg and 'value' in msg['params'] and len(msg['params']['value']):
             if self.trace_file is None and self.keep_timeline:
                 self.trace_file = gzip.open(self.path_base + '_trace.json.gz',
-                                            GZIP_TEXT, compresslevel=7)
+                                            GZIP_TEXT, compresslevel=self.job.get('gzip_level', 7))
                 self.trace_file.write('{"traceEvents":[{}')
             if self.trace_parser is None:
                 from internal.support.trace_parser import Trace
-                self.trace_parser = Trace()
+                self.trace_parser = Trace(compresslevel=self.job.get('gzip_level', 7))
             # write out the trace events one-per-line but pull out any
             # devtools screenshots as separate files.
             trace_events = msg['params']['value']

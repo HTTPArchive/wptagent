@@ -102,7 +102,8 @@ class ProcessTest(object):
         except Exception:
             logging.exception('Error extracting metrics for pubsub result')
 
-        self.save_data()
+        if not self.job.get('discard_test_archive'):
+            self.save_data()
 
         logging.debug("Preparing to generate HAR")
         if self.options.har or 'gcs_har_upload' in self.job:
@@ -156,7 +157,7 @@ class ProcessTest(object):
     def save_data(self):
         """Write-out the post-processed devtools data"""
         devtools_file = os.path.join(self.task['dir'], self.prefix + '_devtools_requests.json.gz')
-        with gzip.open(devtools_file, GZIP_TEXT, 7) as f:
+        with gzip.open(devtools_file, GZIP_TEXT, self.job.get('gzip_level', 7)) as f:
             json.dump(self.data, f)
 
     def merge_user_timing_events(self):
@@ -1008,14 +1009,15 @@ class ProcessTest(object):
                 for request in self.data['requests']:
                     har['log']['entries'].append(self.process_har_request(pd, request))
 
-            # Write out the HAR file
+            # Write out the HAR file only when requested locally (--har)
             har_file = os.path.join(self.task['dir'], self.prefix + '_har.json.gz')
-            with gzip.open(har_file, GZIP_TEXT, 7) as f:
-                json.dump(har, f)
-            
+            har_filename = os.path.basename(har_file)
+            if self.options.har:
+                with gzip.open(har_file, GZIP_TEXT, 7) as f:
+                    json.dump(har, f)
+
             # Upload the HAR to GCS for "successful" tests
             uploaded = True
-            har_filename = os.path.basename(har_file)
             """
             needs_upload = self.job['success']
             if not needs_upload and 'metadata' in self.job and 'retry_count' in self.job['metadata'] and self.job['metadata']['retry_count'] >= 2:
@@ -1051,10 +1053,6 @@ class ProcessTest(object):
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore'])
                 elif 'bq_datastore_failures' in self.job:
                     self.upload_bigquery(har, har_filename, self.job['bq_datastore_failures'])
-            
-            # Delete the local HAR file if it was only supposed to be uploaded
-            if not self.options.har:
-                os.unlink(har_file)
 
         except Exception:
             logging.exception('Error generating HAR')

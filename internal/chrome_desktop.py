@@ -335,12 +335,18 @@ class ChromeDesktop(DesktopBrowser, DevtoolsBrowser):
         # Legacy netlog
         netlog_file = os.path.join(task['dir'], task['prefix']) + '_netlog.txt'
         if os.path.isfile(netlog_file):
-            netlog_gzip = netlog_file + '.gz'
-            with open(netlog_file, 'rb') as f_in:
-                with gzip.open(netlog_gzip, 'wb', 7) as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            if os.path.isfile(netlog_gzip):
-                os.remove(netlog_file)
+            if self.job.get('discard_test_archive'):
+                try:
+                    os.remove(netlog_file)
+                except Exception:
+                    pass
+            else:
+                netlog_gzip = netlog_file + '.gz'
+                with open(netlog_file, 'rb') as f_in:
+                    with gzip.open(netlog_gzip, 'wb', self.job.get('gzip_level', 7)) as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                if os.path.isfile(netlog_gzip):
+                    os.remove(netlog_file)
 
     def setup_prefs(self, profile_dir):
         """Install our base set of preferences"""
@@ -398,7 +404,7 @@ class ChromeDesktop(DesktopBrowser, DevtoolsBrowser):
         with self.netlog_lock:
             self.netlog_event_count = 0
             if self.netlog_fp:
-                if 'netlog' in self.job and self.job['netlog']:
+                if 'netlog' in self.job and self.job['netlog'] and not self.job.get('discard_test_archive'):
                     netlog_file = os.path.join(task['dir'], task['prefix']) + '_netlog.txt.gz'
                     self.netlog_out = gzip.open(netlog_file, 'wt', compresslevel=7, encoding='utf-8')
                 self.netlog = Netlog()
@@ -443,7 +449,7 @@ class ChromeDesktop(DesktopBrowser, DevtoolsBrowser):
                 self.netlog = None
                 if requests is not None and len(requests):
                     netlog_requests = os.path.join(task['dir'], task['prefix']) + '_netlog_requests.json.gz'
-                    with gzip.open(netlog_requests, 'wt', compresslevel=7, encoding='utf-8') as outfile:
+                    with gzip.open(netlog_requests, 'wt', compresslevel=self.job.get('gzip_level', 7), encoding='utf-8') as outfile:
                         json.dump(requests, outfile)
         DevtoolsBrowser.on_stop_recording(self, task)
 

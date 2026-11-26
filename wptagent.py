@@ -392,7 +392,7 @@ class WPTAgent(object):
                         self.browser.run_lighthouse_test(self.task)
                     except Exception:
                         logging.exception('Error running lighthouse test')
-                    if self.task['lighthouse_log']:
+                    if self.task['lighthouse_log'] and not self.job.get('discard_test_archive'):
                         try:
                             log_file = os.path.join(self.task['dir'], 'lighthouse.log.gz')
                             with gzip.open(log_file, GZIP_TEXT, 7) as f_out:

@@ -558,6 +558,15 @@ class WebPageTest(object):
                 job['dtShaper'] = bool('dtShaper' in job and job['dtShaper'])
                 job['disable_video'] = bool(not job['video'] and 'disable_video' in job and job['disable_video'])
                 job['atomic'] = bool('atomic' in job and job['atomic'])
+                job['discard_test_archive'] = bool(
+                    'run' not in job and
+                    'Test ID' in job and
+                    'gcs_test_archive' in job and
+                    isinstance(job['gcs_test_archive'], dict) and
+                    'bucket' in job['gcs_test_archive'] and
+                    'path' in job['gcs_test_archive']
+                )
+                job['gzip_level'] = 1 if job['discard_test_archive'] else 7
                 job['interface'] = None
                 job['persistent_dir'] = self.persistent_dir
                 if 'throttle_cpu' in job:
@@ -1428,78 +1437,69 @@ class WebPageTest(object):
         if self.is_dead:
             return
         if self.job is not None and 'run' not in self.job:
-            # If we are writing the test result directly to Google cloud storage, generate the relevant testinfo
-            if 'gcs_test_archive' in self.job:
-                self.generate_test_info()
-            # Write out the testinfo ini and json files if they are part of the job
-            if 'testinfo_ini' in self.job:
-                from datetime import datetime
-                self.job['testinfo_ini'] = self.job['testinfo_ini'].replace('[test]', '[test]\r\ncompleteTime={}'.format(datetime.now().strftime("%m/%d/%y %H:%M:%S")))
-                ini_path = os.path.join(self.workdir, 'testinfo.ini')
-                with open(ini_path, 'wt') as f_out:
-                    f_out.write(self.job['testinfo_ini'])
-                self.needs_zip.append({'path': ini_path, 'name': 'testinfo.ini'})
-            if 'testinfo' in self.job:
-                self.job['testinfo']['completed'] = time.time()
-                if 'test_runs' not in self.job['testinfo']:
-                    self.job['testinfo']['test_runs'] = {}
-                if 'runs' in self.job['testinfo']:
-                    max_steps = 0
-                    for run in range(self.job['testinfo']['runs']):
-                        run_num = run + 1
-                        # Count the number of steps in the test data
-                        step_count = 0
-                        if self.needs_zip:
-                            for zipitem in self.needs_zip:
-                                matches = re.match(r'^(\d+)_(\d+)_', zipitem['name'])
-                                if matches and run_num == int(matches.group(1)):
-                                    step = int(matches.group(2))
-                                    if step > step_count:
-                                        step_count = step
-                        run_info = {'done': True}
-                        if step_count > 0:
-                            run_info['steps'] = step_count
-                            if step_count > max_steps:
-                                max_steps = step_count
-                        self.job['testinfo']['test_runs'][run_num] = run_info
-                    self.job['testinfo']['steps'] = max_steps
-                json_path = os.path.join(self.workdir, 'testinfo.json')
-                with open(json_path, 'wt') as f_out:
-                    json.dump(self.job['testinfo'], f_out, default=lambda o: '')
-                self.needs_zip.append({'path': json_path, 'name': 'testinfo.json'})
+            discard_archive = bool(
+                self.job.get('discard_test_archive') or (
+                    'Test ID' in self.job and
+                    'gcs_test_archive' in self.job and
+                    isinstance(self.job['gcs_test_archive'], dict) and
+                    'bucket' in self.job['gcs_test_archive'] and
+                    'path' in self.job['gcs_test_archive']
+                )
+            )
+            if not discard_archive:
+                # If we are writing the test result directly to Google cloud storage, generate the relevant testinfo
+                if 'gcs_test_archive' in self.job:
+                    self.generate_test_info()
+                # Write out the testinfo ini and json files if they are part of the job
+                if 'testinfo_ini' in self.job:
+                    from datetime import datetime
+                    self.job['testinfo_ini'] = self.job['testinfo_ini'].replace('[test]', '[test]\r\ncompleteTime={}'.format(datetime.now().strftime("%m/%d/%y %H:%M:%S")))
+                    ini_path = os.path.join(self.workdir, 'testinfo.ini')
+                    with open(ini_path, 'wt') as f_out:
+                        f_out.write(self.job['testinfo_ini'])
+                    self.needs_zip.append({'path': ini_path, 'name': 'testinfo.ini'})
+                if 'testinfo' in self.job:
+                    self.job['testinfo']['completed'] = time.time()
+                    if 'test_runs' not in self.job['testinfo']:
+                        self.job['testinfo']['test_runs'] = {}
+                    if 'runs' in self.job['testinfo']:
+                        max_steps = 0
+                        for run in range(self.job['testinfo']['runs']):
+                            run_num = run + 1
+                            # Count the number of steps in the test data
+                            step_count = 0
+                            if self.needs_zip:
+                                for zipitem in self.needs_zip:
+                                    matches = re.match(r'^(\d+)_(\d+)_', zipitem['name'])
+                                    if matches and run_num == int(matches.group(1)):
+                                        step = int(matches.group(2))
+                                        if step > step_count:
+                                            step_count = step
+                            run_info = {'done': True}
+                            if step_count > 0:
+                                run_info['steps'] = step_count
+                                if step_count > max_steps:
+                                    max_steps = step_count
+                            self.job['testinfo']['test_runs'][run_num] = run_info
+                        self.job['testinfo']['steps'] = max_steps
+                    json_path = os.path.join(self.workdir, 'testinfo.json')
+                    with open(json_path, 'wt') as f_out:
+                        json.dump(self.job['testinfo'], f_out, default=lambda o: '')
+                    self.needs_zip.append({'path': json_path, 'name': 'testinfo.json'})
 
-            # Zip the files
-            zip_path = None
-            if len(self.needs_zip):
-                zip_path = os.path.join(self.workdir, "result.zip")
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as zip_file:
-                    for zipitem in self.needs_zip:
-                        logging.debug('Storing %s (%d bytes)', zipitem['name'], os.path.getsize(zipitem['path']))
-                        zip_file.write(zipitem['path'], zipitem['name'])
-                        try:
-                            os.remove(zipitem['path'])
-                        except Exception:
-                            pass
-            
-            # If we are writing the results directly to GCS, don't post to workdone
-            if zip_path is not None and 'Test ID' in self.job and \
-                    'gcs_test_archive' in self.job and \
-                    'bucket' in self.job['gcs_test_archive'] and \
-                    'path' in self.job['gcs_test_archive']:
-                pass
-                """
-                try:
-                    from google.cloud import storage
-                    client = storage.Client()
-                    bucket = client.get_bucket(self.job['gcs_test_archive']['bucket'])
-                    gcs_path = os.path.join(self.job['gcs_test_archive']['path'], self.job['Test ID'] + '.zip')
-                    blob = bucket.blob(gcs_path)
-                    blob.upload_from_filename(filename=zip_path)
-                    logging.debug('Uploaded test to gs://%s/%s', self.job['gcs_test_archive']['bucket'], gcs_path)
-                except Exception:
-                    logging.exception('Error uploading result to Cloud Storage')
-                """
-            else:
+                # Zip the files
+                zip_path = None
+                if len(self.needs_zip):
+                    zip_path = os.path.join(self.workdir, "result.zip")
+                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as zip_file:
+                        for zipitem in self.needs_zip:
+                            logging.debug('Storing %s (%d bytes)', zipitem['name'], os.path.getsize(zipitem['path']))
+                            zip_file.write(zipitem['path'], zipitem['name'])
+                            try:
+                                os.remove(zipitem['path'])
+                            except Exception:
+                                pass
+
                 # Send the result to WebPageTest
                 data = {'location': self.location,
                         'pc': self.pc_name,
@@ -1623,7 +1623,7 @@ class WebPageTest(object):
                     if crux_data and len(crux_data):
                         logging.debug(crux_data)
                         path = os.path.join(task['dir'], 'crux.json.gz')
-                        with gzip.open(path, GZIP_TEXT, 7) as outfile:
+                        with gzip.open(path, GZIP_TEXT, self.job.get('gzip_level', 7)) as outfile:
                             outfile.write(crux_data)
             except Exception:
                 logging.exception("Error fetching CrUX data")
@@ -1654,11 +1654,13 @@ class WebPageTest(object):
                 self.log_handler = None
             except Exception:
                 pass
+        discard_archive = bool(self.job.get('discard_test_archive'))
         if 'debug_log' in task and os.path.isfile(task['debug_log']):
-            debug_out = task['debug_log'] + '.gz'
-            with open(task['debug_log'], 'rb') as f_in:
-                with gzip.open(debug_out, 'wb', 7) as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+            if not discard_archive:
+                debug_out = task['debug_log'] + '.gz'
+                with open(task['debug_log'], 'rb') as f_in:
+                    with gzip.open(debug_out, 'wb', 7) as f_out:
+                        shutil.copyfileobj(f_in, f_out)
             try:
                 os.remove(task['debug_log'])
             except Exception:
@@ -1684,7 +1686,7 @@ class WebPageTest(object):
             if 'run' in self.job:
                 self.needs_zip = []
             zip_path = None
-            if os.path.isdir(task['dir']):
+            if os.path.isdir(task['dir']) and not discard_archive:
                 # upload any video images
                 if bool(self.job['video']) and len(task['video_directories']):
                     for video_subdirectory in task['video_directories']:

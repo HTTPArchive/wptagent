@@ -34,7 +34,8 @@ except BaseException:
 ##########################################################################
 class Trace():
     """Main class"""
-    def __init__(self):
+    def __init__(self, compresslevel=9):
+        self.compresslevel = compresslevel
         self.thread_stack = {}
         self.ignore_threads = {}
         self.threads = {}
@@ -87,7 +88,7 @@ class Trace():
         try:
             _, ext = os.path.splitext(out_file)
             if ext.lower() == '.gz':
-                with gzip.open(out_file, GZIP_TEXT) as f:
+                with gzip.open(out_file, GZIP_TEXT, self.compresslevel) as f:
                     json.dump(json_data, f)
             else:
                 with open(out_file, 'w') as f:

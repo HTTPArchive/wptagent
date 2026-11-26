@@ -399,7 +399,8 @@ class DevtoolsBrowser(object):
         if os.path.isfile(devtools_file):
             from internal.support.devtools_parser import DevToolsParser
             out_file = path_base + '_devtools_requests.json.gz'
-            options = {'devtools': devtools_file, 'cached': task['cached'], 'out': out_file}
+            options = {'devtools': devtools_file, 'cached': task['cached'], 'out': out_file,
+                       'gzip_level': self.job.get('gzip_level', 7)}
             netlog = path_base + '_netlog_requests.json.gz'
             options['netlog'] = netlog if os.path.isfile(netlog) else None
             timeline_requests = path_base + '_timeline_requests.json.gz'
@@ -738,12 +739,12 @@ class DevtoolsBrowser(object):
                 else:
                     custom_metrics[name] = self.devtools.execute_js(script)
             path = os.path.join(task['dir'], task['prefix'] + '_metrics.json.gz')
-            with gzip.open(path, GZIP_TEXT, 7) as outfile:
+            with gzip.open(path, GZIP_TEXT, self.job.get('gzip_level', 7)) as outfile:
                 outfile.write(json.dumps(custom_metrics))
         user_timing = self.run_js_file('user_timing.js')
         if user_timing is not None:
             path = os.path.join(task['dir'], task['prefix'] + '_timed_events.json.gz')
-            with gzip.open(path, GZIP_TEXT, 7) as outfile:
+            with gzip.open(path, GZIP_TEXT, self.job.get('gzip_level', 7)) as outfile:
                 outfile.write(json.dumps(user_timing))
 
     def process_command(self, command):
@@ -918,8 +919,10 @@ class DevtoolsBrowser(object):
         if 'url' in self.job and self.job['url'] is not None and not self.is_webkit:
             if not self.job['lighthouse_config'] and not self.job['dtShaper']:
                 self.job['shaper'].configure(self.job, task)
+            discard_archive = bool(self.job.get('discard_test_archive'))
+            gzip_level = self.job.get('gzip_level', 7)
             output_path = os.path.join(task['dir'], 'lighthouse.json')
-            json_file = os.path.join(task['dir'], 'lighthouse.report.json')
+            json_file = output_path if discard_archive else os.path.join(task['dir'], 'lighthouse.report.json')
             json_gzip = os.path.join(task['dir'], 'lighthouse.json.gz')
             html_file = os.path.join(task['dir'], 'lighthouse.report.html')
             html_gzip = os.path.join(task['dir'], 'lighthouse.html.gz')
@@ -931,10 +934,11 @@ class DevtoolsBrowser(object):
                        '--disable-full-page-screenshot',
                        '--max-wait-for-load', str(int(time_limit * 1000)),
                        '--hostname', '127.0.0.1',
-                       '--port', str(task['port']),
-                       '--output', 'html',
-                       '--output', 'json',
-                       '--output-path', '"{0}"'.format(output_path)]
+                       '--port', str(task['port'])]
+            if not discard_archive:
+                command.extend(['--output', 'html'])
+            command.extend(['--output', 'json',
+                            '--output-path', '"{0}"'.format(output_path)])
             if self.job['lighthouse_config']:
                 try:
                     lighthouse_config_file = os.path.join(task['dir'], 'lighthouse-config.json')
@@ -958,7 +962,7 @@ class DevtoolsBrowser(object):
                     command.extend(['--throttling-method', 'provided'])
             if 'debug' in self.job and self.job['debug']:
                 command.extend(['--verbose'])
-            if self.job['keep_lighthouse_trace']:
+            if self.job['keep_lighthouse_trace'] and not discard_archive:
                 command.append('--save-assets')
             if not self.job['keep_lighthouse_screenshots']:
                 command.extend(['--skip-audits', 'screenshot-thumbnails,final-screenshot,full-page-screenshot'])
@@ -997,7 +1001,7 @@ class DevtoolsBrowser(object):
             kill_all('node', True)
             self.job['shaper'].reset()
             # Rename and compress the trace file, delete the other assets
-            if self.job['keep_lighthouse_trace']:
+            if self.job['keep_lighthouse_trace'] and not discard_archive:
                 try:
                     lh_trace_src = os.path.join(task['dir'], 'lighthouse-0.trace.json')
                     if os.path.isfile(lh_trace_src):
@@ -1007,7 +1011,7 @@ class DevtoolsBrowser(object):
                             if trace is not None and 'traceEvents' in trace:
                                 lighthouse_trace = os.path.join(task['dir'],
                                                                 'lighthouse_trace.json.gz')
-                            with gzip.open(lighthouse_trace, GZIP_TEXT, 7) as f_out:
+                            with gzip.open(lighthouse_trace, GZIP_TEXT, gzip_level) as f_out:
                                 f_out.write('{"traceEvents":[{}')
                                 for trace_event in trace['traceEvents']:
                                     f_out.write(",\n")
@@ -1022,13 +1026,17 @@ class DevtoolsBrowser(object):
                     os.remove(file_path)
                 except Exception:
                     pass
+            if not os.path.isfile(json_file):
+                alt_json = os.path.join(task['dir'], 'lighthouse.report.json')
+                if os.path.isfile(alt_json):
+                    json_file = alt_json
             if os.path.isfile(json_file):
                 lh_report = None
                 with io.open(json_file, 'r', encoding='utf-8') as f_in:
                     lh_report = json.load(f_in)
 
                 with open(json_file, 'rb') as f_in:
-                    with gzip.open(json_gzip, 'wb', 7) as f_out:
+                    with gzip.open(json_gzip, 'wb', gzip_level) as f_out:
                         shutil.copyfileobj(f_in, f_out)
                 try:
                     os.remove(json_file)
@@ -1085,13 +1093,13 @@ class DevtoolsBrowser(object):
                                 elif 'numericValue' in audit:
                                     audits[name] = audit['numericValue']
                     audits_gzip = os.path.join(task['dir'], 'lighthouse_audits.json.gz')
-                    with gzip.open(audits_gzip, GZIP_TEXT, 7) as f_out:
+                    with gzip.open(audits_gzip, GZIP_TEXT, gzip_level) as f_out:
                         json.dump(audits, f_out)
             # Compress the HTML lighthouse report
-            if os.path.isfile(html_file):
+            if not discard_archive and os.path.isfile(html_file):
                 try:
                     with open(html_file, 'rb') as f_in:
-                        with gzip.open(html_gzip, 'wb', 7) as f_out:
+                        with gzip.open(html_gzip, 'wb', gzip_level) as f_out:
                             shutil.copyfileobj(f_in, f_out)
                     os.remove(html_file)
                 except Exception:
