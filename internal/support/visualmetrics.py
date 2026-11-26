@@ -116,7 +116,7 @@ def extract_frames(video, directory, full_resolution, viewport):
         # see https://en.wikibooks.org/wiki/FFMPEG_An_Intermediate_Guide/image_sequence#Percent_in_filename
         dir_escaped = directory.replace("%", "%%")
         command = ['ffmpeg', '-v', 'debug', '-i', video, '-vsync', '0',
-                   '-vf', crop + scale + decimate + '=0:64:640:0.001',
+                   '-vf', crop + scale + decimate + '=max=0:hi=64:lo=640:frac=0.001',
                    os.path.join(dir_escaped, 'img-%d.png')]
         logging.debug(' '.join(command))
         proc = subprocess.Popen(command, stderr=subprocess.PIPE, universal_newlines=True)
@@ -770,6 +770,27 @@ def clean_directory(directory):
         os.remove(file)
 
 
+def parse_compare_ae(err):
+    """Parse pixel difference count from ImageMagick compare -metric AE stderr output.
+    Handles both IMv6 ('0') and IMv7 ('0 (0)' / scientific notation) and ignores warning lines.
+    """
+    if isinstance(err, bytes):
+        try:
+            err = err.decode('utf-8', errors='replace')
+        except Exception:
+            return None
+    if not err:
+        return None
+    for line in reversed(err.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        match = re.match(r'^([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?:\s+\([^)]+\))?$', line)
+        if match:
+            return int(round(float(match.group(1))))
+    return None
+
+
 def is_color_frame(file, color_file):
     """Check a section from the middle, top and bottom of the viewport to see if it matches"""
     global frame_cache
@@ -796,18 +817,13 @@ def is_color_frame(file, color_file):
                 int(width / 4), height - int(height / 5) - 50))
             for crop in crops:
                 command = ('{0} "{1}" "(" "{2}" -crop {3} -resize 200x200! ")"'
-                           ' miff:- | {4} -metric AE - -fuzz 15% null:'
+                           ' miff:- | {4} -metric AE -fuzz 15% - null:'
                           ).format(image_magick['convert'], color_file, file, crop,
                                    image_magick['compare'])
                 compare = subprocess.Popen(command, stderr=subprocess.PIPE, shell=True)
                 _, err = compare.communicate()
-                if (sys.version_info >= (3, 0)):
-                    try:
-                        err = err.decode('utf-8')
-                    except Exception:
-                        pass
-                if re.match('^[0-9]+$', err):
-                    different_pixels = int(err)
+                different_pixels = parse_compare_ae(err)
+                if different_pixels is not None:
                     if different_pixels < 100:
                         match = True
                         break
@@ -824,11 +840,11 @@ def is_white_frame(file, white_file):
     if os.path.isfile(white_file):
         if options.viewport:
             command = ('{0} "{1}" "(" "{2}" -resize 200x200! ")" miff:- | '
-                       '{3} -metric AE - -fuzz 10% null:').format(
+                       '{3} -metric AE -fuzz 10% - null:').format(
                            image_magick['convert'], white_file, file, image_magick['compare'])
         else:
             command = ('{0} "{1}" "(" "{2}" -gravity Center -crop 50%x33%+0+0 -resize 200x200! ")" miff:- | '
-                       '{3} -metric AE - -fuzz 10% null:').format(
+                       '{3} -metric AE -fuzz 10% - null:').format(
                            image_magick['convert'], white_file, file, image_magick['compare'])
         if client_viewport is not None:
             crop = '{0:d}x{1:d}+{2:d}+{3:d}'.format(
@@ -837,17 +853,12 @@ def is_white_frame(file, white_file):
                 client_viewport['x'],
                 client_viewport['y'])
             command = ('{0} "{1}" "(" "{2}" -crop {3} -resize 200x200! ")" miff:- | '
-                       '{4} -metric AE - -fuzz 10% null:').format(
+                       '{4} -metric AE -fuzz 10% - null:').format(
                            image_magick['convert'], white_file, file, crop, image_magick['compare'])
         compare = subprocess.Popen(command, stderr=subprocess.PIPE, shell=True)
         _, err = compare.communicate()
-        if (sys.version_info >= (3, 0)):
-            try:
-                err = err.decode('utf-8')
-            except Exception:
-                pass
-        if re.match('^[0-9]+$', err):
-            different_pixels = int(err)
+        different_pixels = parse_compare_ae(err)
+        if different_pixels is not None:
             if different_pixels < 500:
                 white = True
 
@@ -885,19 +896,14 @@ def frames_match(image1, image2, fuzz_percent,
             image1, mask_rect['width'], mask_rect['height'], mask_rect['x'], mask_rect['y'])
         img2 = '( "{0}" -size {1}x{2} xc:white -geometry +{3}+{4} -compose over -composite )'.format(
             image2, mask_rect['width'], mask_rect['height'], mask_rect['x'], mask_rect['y'])
-    command = '{0} {1} {2} {3}miff:- | {4} -metric AE - {5}null:'.format(
+    command = '{0} {1} {2} {3}miff:- | {4} -metric AE {5}- null:'.format(
         image_magick['convert'], img1, img2, crop, image_magick['compare'], fuzz)
     if platform.system() != 'Windows':
         command = command.replace('(', '\\(').replace(')', '\\)')
     compare = subprocess.Popen(command, stderr=subprocess.PIPE, shell=True)
     _, err = compare.communicate()
-    if (sys.version_info >= (3, 0)):
-        try:
-            err = err.decode('utf-8')
-        except Exception:
-            pass
-    if re.match('^[0-9]+$', err):
-        different_pixels = int(err)
+    different_pixels = parse_compare_ae(err)
+    if different_pixels is not None:
         if different_pixels <= max_differences:
             match = True
     else:
@@ -1691,12 +1697,22 @@ def main():
         options.orange = True
 
     if platform.system() == "Windows":
+        found_im = False
         paths = [os.getenv('ProgramFiles'), os.getenv('ProgramFiles(x86)')]
         for path in paths:
             if path is not None and os.path.isdir(path):
                 dirs = sorted(os.listdir(path), reverse=True)
                 for subdir in dirs:
                     if subdir.lower().startswith('imagemagick'):
+                        magick = os.path.join(path, subdir, 'magick.exe')
+                        if os.path.isfile(magick):
+                            if magick.find(' ') >= 0:
+                                magick = '"{0}"'.format(magick)
+                            image_magick['convert'] = magick
+                            image_magick['compare'] = magick + ' compare'
+                            image_magick['mogrify'] = magick + ' mogrify'
+                            found_im = True
+                            break
                         convert = os.path.join(path, subdir, 'convert.exe')
                         compare = os.path.join(path, subdir, 'compare.exe')
                         mogrify = os.path.join(path, subdir, 'mogrify.exe')
@@ -1712,7 +1728,18 @@ def main():
                             image_magick['convert'] = convert
                             image_magick['compare'] = compare
                             image_magick['mogrify'] = mogrify
+                            found_im = True
                             break
+                if found_im:
+                    break
+        if not found_im and getattr(shutil, 'which', None) and shutil.which('magick'):
+            image_magick['convert'] = 'magick'
+            image_magick['compare'] = 'magick compare'
+            image_magick['mogrify'] = 'magick mogrify'
+    elif getattr(shutil, 'which', None) and shutil.which('magick'):
+        image_magick['convert'] = 'magick'
+        image_magick['compare'] = 'magick compare'
+        image_magick['mogrify'] = 'magick mogrify'
 
     ok = False
     try:

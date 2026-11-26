@@ -12,6 +12,7 @@ import os
 import platform
 import gzip
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -64,12 +65,22 @@ class WPTAgent(object):
         atexit.register(self.cleanup)
         self.image_magick = {'convert': 'convert', 'compare': 'compare', 'mogrify': 'mogrify'}
         if platform.system() == "Windows":
+            found_im = False
             paths = [os.getenv('ProgramFiles'), os.getenv('ProgramFiles(x86)')]
             for path in paths:
                 if path is not None and os.path.isdir(path):
                     dirs = sorted(os.listdir(path), reverse=True)
                     for subdir in dirs:
                         if subdir.lower().startswith('imagemagick'):
+                            magick = os.path.join(path, subdir, 'magick.exe')
+                            if os.path.isfile(magick):
+                                if magick.find(' ') >= 0:
+                                    magick = '"{0}"'.format(magick)
+                                self.image_magick['convert'] = magick
+                                self.image_magick['compare'] = magick + ' compare'
+                                self.image_magick['mogrify'] = magick + ' mogrify'
+                                found_im = True
+                                break
                             convert = os.path.join(path, subdir, 'convert.exe')
                             compare = os.path.join(path, subdir, 'compare.exe')
                             mogrify = os.path.join(path, subdir, 'mogrify.exe')
@@ -85,7 +96,18 @@ class WPTAgent(object):
                                 self.image_magick['convert'] = convert
                                 self.image_magick['compare'] = compare
                                 self.image_magick['mogrify'] = mogrify
+                                found_im = True
                                 break
+                    if found_im:
+                        break
+            if not found_im and getattr(shutil, 'which', None) and shutil.which('magick'):
+                self.image_magick['convert'] = 'magick'
+                self.image_magick['compare'] = 'magick compare'
+                self.image_magick['mogrify'] = 'magick mogrify'
+        elif getattr(shutil, 'which', None) and shutil.which('magick'):
+            self.image_magick['convert'] = 'magick'
+            self.image_magick['compare'] = 'magick compare'
+            self.image_magick['mogrify'] = 'magick mogrify'
 
         if 'alertsize' in options and options.alertsize == True:
             import configparser

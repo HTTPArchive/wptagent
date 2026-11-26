@@ -123,20 +123,29 @@ class VideoProcessing(object):
         crop = ''
         if crop_region is not None:
             crop = '-crop {0} '.format(crop_region)
+        fuzz = ''
+        if fuzz_percent > 0:
+            fuzz = '-fuzz {0:d}% '.format(fuzz_percent)
         match = False
-        command = '{0} {1} {2} {3}miff:- | {4} -metric AE -'.format(
+        command = '{0} {1} {2} {3}miff:- | {4} -metric AE {5}- null:'.format(
             self.job['image_magick']['convert'],
             image1, image2, crop,
-            self.job['image_magick']['compare'])
-        if fuzz_percent > 0:
-            command += ' -fuzz {0:d}%'.format(fuzz_percent)
-        command += ' null:'.format()
+            self.job['image_magick']['compare'],
+            fuzz)
         compare = subprocess.Popen(command, stderr=subprocess.PIPE, shell=True)
         _, err = compare.communicate()
-        if re.match('^[0-9]+$', err):
-            different_pixels = int(err)
-            if different_pixels <= max_differences:
-                match = True
+        if isinstance(err, bytes):
+            err = err.decode('utf-8', errors='replace')
+        for line in reversed(err.splitlines()):
+            line = line.strip()
+            if not line:
+                continue
+            m = re.match(r'^([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?:\s+\([^)]+\))?$', line)
+            if m:
+                different_pixels = int(round(float(m.group(1))))
+                if different_pixels <= max_differences:
+                    match = True
+                break
         return match
 
     def cap_frame_count(self, directory, maxframes):
