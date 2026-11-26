@@ -159,7 +159,8 @@ class DevTools(object):
         self.profile_start('devtools_start')
         proxies = {"http": None, "https": None}
         ret = False
-        end_time = monotonic() + timeout
+        start_time = monotonic()
+        end_time = start_time + timeout
         while not ret and monotonic() < end_time and not self.must_exit:
             try:
                 response = requests.get(self.url, timeout=timeout, proxies=proxies)
@@ -175,8 +176,8 @@ class DevTools(object):
                                 ret = True
                                 logging.debug('Dev tools interface is available')
             except Exception as err:
-                logging.exception("Connect to dev tools Error: %s", err.__str__())
-                time.sleep(0.5)
+                logging.debug("Connect to dev tools Error: %s", err.__str__())
+                time.sleep(0.05 if (monotonic() - start_time) < 1.5 else 0.5)
         self.profile_end('devtools_start')
         return ret
 
@@ -185,7 +186,8 @@ class DevTools(object):
         self.profile_start('connect')
         if self.is_webkit and not self.is_ios:
             ret = False
-            end_time = monotonic() + timeout
+            start_time = monotonic()
+            end_time = start_time + timeout
             while not ret and monotonic() < end_time and not self.must_exit:
                 try:
                     self.websocket = WebKitGTKInspector()
@@ -197,13 +199,14 @@ class DevTools(object):
                         ret = True
                 except Exception:
                     logging.exception("Error connecting to webkit inspector")
-                    time.sleep(0.5)
+                    time.sleep(0.05 if (monotonic() - start_time) < 1.5 else 0.5)
         else:
             import requests
             session = requests.session()
             proxies = {"http": None, "https": None}
             ret = False
-            end_time = monotonic() + timeout
+            start_time = monotonic()
+            end_time = start_time + timeout
             while not ret and monotonic() < end_time and not self.must_exit:
                 try:
                     response = session.get(self.url, timeout=timeout, proxies=proxies)
@@ -247,12 +250,12 @@ class DevTools(object):
                                     except Exception as err:
                                         logging.exception("Connect to dev tools websocket Error: %s", err.__str__())
                             else:
-                                time.sleep(0.5)
+                                time.sleep(0.05 if (monotonic() - start_time) < 1.5 else 0.5)
                         else:
-                            time.sleep(0.5)
+                            time.sleep(0.05 if (monotonic() - start_time) < 1.5 else 0.5)
                 except Exception as err:
                     logging.debug("Connect to dev tools Error: %s", err.__str__())
-                    time.sleep(0.5)
+                    time.sleep(0.05 if (monotonic() - start_time) < 1.5 else 0.5)
             # Wait for the default target to be created for iOS
             if ret and self.is_ios:
                 while self.default_target is None and monotonic() < end_time and not self.must_exit:

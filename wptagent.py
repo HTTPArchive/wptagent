@@ -32,6 +32,7 @@ class WPTAgent(object):
     """Main agent workflow"""
     def __init__(self, options, browsers):
         from internal.browsers import Browsers
+        from internal.cache import AgentCache
         from internal.webpagetest import WebPageTest
         from internal.traffic_shaping import TrafficShaper
         from internal.adb import Adb
@@ -49,7 +50,9 @@ class WPTAgent(object):
         self.xvfb = None
         self.hostname = socket.gethostname()
         self.root_path = os.path.abspath(os.path.dirname(__file__))
+        self.cache = AgentCache()
         self.wpt = WebPageTest(options, os.path.join(self.root_path, "work"))
+        self.wpt.cache = self.cache
         self.persistent_work_dir = self.wpt.get_persistent_dir()
         self.adb = Adb(self.options, self.persistent_work_dir) if self.options.android else None
         self.ios = iOSDevice(self.options.device) if self.options.iOS else None
@@ -307,6 +310,7 @@ class WPTAgent(object):
                 self.job['message_server'] = self.message_server
                 self.job['capture_display'] = self.capture_display
                 self.job['shaper'] = self.shaper
+                self.job['cache'] = self.cache
                 self.task = self.wpt.get_task(self.job)
                 while self.task is not None:
                     start = monotonic()

@@ -692,12 +692,13 @@ class DesktopBrowser(BaseBrowser):
                 logging.exception('Error waiting for ffmpeg output')
             self.ffmpeg_output_thread = None
         self.job['shaper'].reset()
+        # Start video post-processing immediately once ffmpeg has flushed the file
+        self.start_video_processing(task)
 
-    def on_start_processing(self, task):
-        """Start any processing of the captured data"""
-        if self.must_exit:
+    def start_video_processing(self, task):
+        """Start visualmetrics processing in the background (idempotent per step)"""
+        if self.must_exit or self.video_processing is not None or task is None or not task.get('log_data'):
             return
-        # kick off the video processing (async)
         if 'video_file' in task and os.path.isfile(task['video_file']):
             self.profile_start('desktop.video_processing')
             video_path = os.path.join(task['dir'], task['video_subdirectory'])
@@ -733,11 +734,18 @@ class DesktopBrowser(BaseBrowser):
                 except Exception:
                     pass
             try:
-                logging.debug('Video file size: %d', os.path.getsize(video_path))
+                logging.debug('Video file size: %d', os.path.getsize(task['video_file']))
             except Exception:
                 pass
             logging.debug(' '.join(args))
             self.video_processing = subprocess.Popen(args, close_fds=True)
+
+    def on_start_processing(self, task):
+        """Start any processing of the captured data"""
+        if self.must_exit:
+            return
+        # kick off the video processing (async, no-op if already started in on_stop_recording)
+        self.start_video_processing(task)
         # Process the tcpdump (async)
         if self.pcap_file is not None:
             logging.debug('Compressing pcap')

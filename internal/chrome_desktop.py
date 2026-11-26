@@ -4,6 +4,7 @@
 # Use of this source code is governed by the Polyform Shield 1.0.0 license that can be
 # found in the LICENSE.md file.
 """Logic for controlling a desktop Chrome browser"""
+import atexit
 import gzip
 import logging
 import os
@@ -90,6 +91,10 @@ ENABLE_BLINK_FEATURES = [
 
 class ChromeDesktop(DesktopBrowser, DevtoolsBrowser):
     """Desktop Chrome"""
+    _policy_installed = False
+    _policy_atexit_registered = False
+    _policy_lock = threading.Lock()
+
     def __init__(self, path, options, job):
         self.options = options
         DesktopBrowser.__init__(self, path, options, job)
@@ -235,16 +240,17 @@ class ChromeDesktop(DesktopBrowser, DevtoolsBrowser):
             self.profile_start('chrome.idle1')
             DesktopBrowser.wait_for_idle(self)
             self.profile_end('chrome.idle1')
-            self.profile_start('chrome.prepare_browser')
-            DevtoolsBrowser.prepare_browser(self, task)
-            self.profile_end('chrome.prepare_browser')
-            self.profile_start('chrome.start_page')
-            DevtoolsBrowser.navigate(self, self.start_page)
-            self.profile_end('chrome.start_page')
-            # When throttling the CPU, Chrome sits in a busy loop so ony apply a short idle wait
-            self.profile_start('chrome.idle2')
-            DesktopBrowser.wait_for_idle(self, 2)
-            self.profile_end('chrome.idle2')
+            if not task['running_lighthouse']:
+                self.profile_start('chrome.prepare_browser')
+                DevtoolsBrowser.prepare_browser(self, task)
+                self.profile_end('chrome.prepare_browser')
+                self.profile_start('chrome.start_page')
+                DevtoolsBrowser.navigate(self, self.start_page)
+                self.profile_end('chrome.start_page')
+                # When throttling the CPU, Chrome sits in a busy loop so ony apply a short idle wait
+                self.profile_start('chrome.idle2')
+                DesktopBrowser.wait_for_idle(self, 2)
+                self.profile_end('chrome.idle2')
             self.profile_end('chrome.post_launch')
 
     def stream_netlog(self):
@@ -335,7 +341,6 @@ class ChromeDesktop(DesktopBrowser, DevtoolsBrowser):
                     shutil.copyfileobj(f_in, f_out)
             if os.path.isfile(netlog_gzip):
                 os.remove(netlog_file)
-        self.remove_policy()
 
     def setup_prefs(self, profile_dir):
         """Install our base set of preferences"""
@@ -349,24 +354,43 @@ class ChromeDesktop(DesktopBrowser, DevtoolsBrowser):
             pass
 
     def install_policy(self):
-        """Install the required policy list (Linux only right now)"""
+        """Install the required policy list once per process (Linux only right now)"""
         if platform.system() == "Linux":
-            subprocess.call(['sudo', 'mkdir', '-p', '/etc/opt/chrome/policies/managed'])
-            subprocess.call(['sudo', 'chmod', '-w', '/etc/opt/chrome/policies/managed'])
-            subprocess.call(['sudo', 'mkdir', '-p', '/etc/chromium/policies/managed'])
-            subprocess.call(['sudo', 'chmod', '-w', '/etc/chromium/policies/managed'])
-            src = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                               'support', 'chrome', 'wpt_policy.json')
-            subprocess.call(['sudo', 'cp', src,
-                             '/etc/opt/chrome/policies/managed/wpt_policy.json'])
-            subprocess.call(['sudo', 'cp', src,
-                             '/etc/chromium/policies/managed/wpt_policy.json'])
+            with ChromeDesktop._policy_lock:
+                chrome_policy = '/etc/opt/chrome/policies/managed/wpt_policy.json'
+                chromium_policy = '/etc/chromium/policies/managed/wpt_policy.json'
+                if ChromeDesktop._policy_installed and os.path.isfile(chrome_policy):
+                    return
+                subprocess.call(['sudo', 'mkdir', '-p', '/etc/opt/chrome/policies/managed'])
+                subprocess.call(['sudo', 'chmod', '-w', '/etc/opt/chrome/policies/managed'])
+                subprocess.call(['sudo', 'mkdir', '-p', '/etc/chromium/policies/managed'])
+                subprocess.call(['sudo', 'chmod', '-w', '/etc/chromium/policies/managed'])
+                src = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                   'support', 'chrome', 'wpt_policy.json')
+                subprocess.call(['sudo', 'cp', src, chrome_policy])
+                subprocess.call(['sudo', 'cp', src, chromium_policy])
+                ChromeDesktop._policy_installed = True
+                if not ChromeDesktop._policy_atexit_registered:
+                    atexit.register(ChromeDesktop._cleanup_policy)
+                    ChromeDesktop._policy_atexit_registered = True
+
+    @classmethod
+    def _cleanup_policy(cls):
+        """Remove the installed policy on process exit"""
+        if platform.system() == "Linux":
+            with cls._policy_lock:
+                if cls._policy_installed:
+                    subprocess.call(['sudo', 'rm', '-f', '/etc/opt/chrome/policies/managed/wpt_policy.json'])
+                    subprocess.call(['sudo', 'rm', '-f', '/etc/chromium/policies/managed/wpt_policy.json'])
+                    cls._policy_installed = False
 
     def remove_policy(self):
         """Remove the installed policy"""
         if platform.system() == "Linux":
-            subprocess.call(['sudo', 'rm', '/etc/opt/chrome/policies/managed/wpt_policy.json'])
-            subprocess.call(['sudo', 'rm', '/etc/chromium/policies/managed/wpt_policy.json'])
+            with ChromeDesktop._policy_lock:
+                subprocess.call(['sudo', 'rm', '-f', '/etc/opt/chrome/policies/managed/wpt_policy.json'])
+                subprocess.call(['sudo', 'rm', '-f', '/etc/chromium/policies/managed/wpt_policy.json'])
+                ChromeDesktop._policy_installed = False
 
     def on_start_recording(self, task):
         """Notification that we are about to start an operation that needs to be recorded"""

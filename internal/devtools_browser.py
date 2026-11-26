@@ -34,6 +34,7 @@ from .optimization_checks import OptimizationChecks
 class DevtoolsBrowser(object):
     """Devtools Browser base"""
     CONNECT_TIME_LIMIT = 120
+    _wappalyzer_cache = {}
 
     def __init__(self, options, job, use_devtools_video=True, is_webkit=False, is_ios=False):
         self.options = options
@@ -53,6 +54,7 @@ class DevtoolsBrowser(object):
         self.webkit_context = None
         self.total_sleep = 0
         self.document_domain = None
+        self.optimization = None
         self.HISTOGRAMS = [
             'Blink.UseCounter.WebDXFeatures'
         ]
@@ -82,6 +84,9 @@ class DevtoolsBrowser(object):
 
     def disconnect(self):
         """Disconnect from dev tools"""
+        if self.optimization is not None:
+            self.optimization.join()
+            self.optimization = None
         if self.devtools is not None:
             # Always navigate to about:blank after finishing in case the tab is
             # remembered across sessions
@@ -309,14 +314,20 @@ class DevtoolsBrowser(object):
                     task['navigated'] = True
             self.task = None
 
+    def start_optimization_checks(self, task):
+        """Start background optimization checks if not already running"""
+        if self.must_exit_now or self.optimization is not None or not task.get('log_data'):
+            return
+        self.optimization = OptimizationChecks(self.job, task, self.get_requests(True))
+        self.optimization.start()
+
     def on_start_processing(self, task):
         """Start any processing of the captured data"""
         if self.must_exit_now:
             return
         if task['log_data']:
-            # Start the processing that can run in a background thread
-            optimization = OptimizationChecks(self.job, task, self.get_requests(True))
-            optimization.start()
+            # Start the processing that can run in a background thread (no-op if already started)
+            self.start_optimization_checks(task)
             # Run the video post-processing
             if self.use_devtools_video and self.job['video']:
                 self.process_video()
@@ -326,11 +337,15 @@ class DevtoolsBrowser(object):
                 self.run_axe(task)
 
             # wait for the background optimization checks
-            optimization.join()
+            if self.optimization is not None:
+                self.optimization.join()
+                self.optimization = None
 
     def wait_for_processing(self, task):
         """Wait for the background processing (if any)"""
-        pass
+        if self.optimization is not None:
+            self.optimization.join()
+            self.optimization = None
 
     def execute_js(self, script):
         """Run javascipt"""
@@ -439,8 +454,12 @@ class DevtoolsBrowser(object):
         script = None
         script_file_path = os.path.join(self.script_dir, file_name)
         if os.path.isfile(script_file_path):
-            with io.open(script_file_path, 'r', encoding='utf-8') as script_file:
-                script = script_file.read()
+            cache = self.job.get('cache') if isinstance(self.job, dict) else None
+            if cache is not None:
+                script = cache.read_text(script_file_path, encoding='utf-8')
+            else:
+                with io.open(script_file_path, 'r', encoding='utf-8') as script_file:
+                    script = script_file.read()
         if script is not None:
             ret = self.devtools.execute_js(script)
         return ret
@@ -598,8 +617,13 @@ class DevtoolsBrowser(object):
         if 'Blink.UseCounter.WebDXFeatures' in histograms:
             try:
                 path = os.path.abspath(os.path.dirname(__file__))
-                with open(os.path.join(path, 'support', 'FEATURES', 'webdx.json'), 'rt', encoding='utf-8') as f:
-                    mapping = json.load(f)
+                webdx_path = os.path.join(path, 'support', 'FEATURES', 'webdx.json')
+                cache = self.job.get('cache') if isinstance(self.job, dict) else None
+                if cache is not None:
+                    mapping = cache.read_json(webdx_path, encoding='utf-8')
+                else:
+                    with open(webdx_path, 'rt', encoding='utf-8') as f:
+                        mapping = json.load(f)
 
                 result = histograms['Blink.UseCounter.WebDXFeatures']
                 if 'histogram' in result and 'buckets' in result['histogram']:
@@ -623,6 +647,15 @@ class DevtoolsBrowser(object):
         """Collect all of the in-page browser metrics that we need"""
         if self.must_exit_now:
             return
+        # Collect read-only page_data first so document_hostname is populated before
+        # kicking off background optimization checks to overlap with custom metrics.
+        page_data = self.run_js_file('page_data.js')
+        self.document_domain = None
+        if page_data is not None:
+            if 'document_hostname' in page_data:
+                self.document_domain = page_data['document_hostname']
+            task['page_data'].update(page_data)
+        self.start_optimization_checks(task)
         if 'customMetrics' in self.job:
             custom_metrics = {}
             requests = None
@@ -712,12 +745,6 @@ class DevtoolsBrowser(object):
             path = os.path.join(task['dir'], task['prefix'] + '_timed_events.json.gz')
             with gzip.open(path, GZIP_TEXT, 7) as outfile:
                 outfile.write(json.dumps(user_timing))
-        page_data = self.run_js_file('page_data.js')
-        self.document_domain = None
-        if page_data is not None:
-            if 'document_hostname' in page_data:
-                self.document_domain = page_data['document_hostname']
-            task['page_data'].update(page_data)
 
     def process_command(self, command):
         """Process an individual script command"""
@@ -897,17 +924,6 @@ class DevtoolsBrowser(object):
             html_file = os.path.join(task['dir'], 'lighthouse.report.html')
             html_gzip = os.path.join(task['dir'], 'lighthouse.html.gz')
             time_limit = min(int(task['time_limit']), 80)
-            # see what version of lighthouse we are running
-            lighthouse_version = 1
-            try:
-                out = subprocess.check_output('lighthouse --version', shell=True, universal_newlines=True)
-                if out is not None and len(out):
-                    match = re.search(r'^\d+', out)
-                    if match:
-                        lighthouse_version = int(match.group())
-                logging.debug("Lighthouse version %d", lighthouse_version)
-            except Exception:
-                logging.exception('Error getting lighthouse version')
             command = ['lighthouse',
                        '"{0}"'.format(self.job['url']),
                        '--channel', 'wpt',
@@ -1087,8 +1103,13 @@ class DevtoolsBrowser(object):
         start = monotonic()
         script = None
         try:
-            with open(os.path.join(self.support_path, 'axe', 'axe-core', 'axe.min.js')) as f_in:
-                script = f_in.read()
+            axe_path = os.path.join(self.support_path, 'axe', 'axe-core', 'axe.min.js')
+            cache = self.job.get('cache') if isinstance(self.job, dict) else None
+            if cache is not None:
+                script = cache.read_text(axe_path, encoding='utf-8')
+            else:
+                with open(axe_path) as f_in:
+                    script = f_in.read()
             if script is not None:
                 script += 'axe.run({runOnly:['
                 axe_cats = self.job.get('axe_categories').split(',')
@@ -1162,24 +1183,41 @@ class DevtoolsBrowser(object):
                 if self.document_domain is not None:
                     dns_domain = str(self.document_domain)
                     while dns_domain.find('.') > 0:
+                        pending_types = [t for t in dns_types if t not in dns]
+                        if not pending_types:
+                            break
                         logging.debug('Wappalyzer resolving %s', dns_domain)
                         try:
                             from dns import resolver
                             dns_resolver = resolver.Resolver()
                             dns_resolver.timeout = 1
                             dns_resolver.lifetime = 1
-                            for dns_type in dns_types:
-                                if dns_type not in dns:
-                                    try:
-                                        result = []
-                                        answer = dns_resolver.query(dns_domain, dns_type.upper(), raise_on_no_answer=False)
-                                        for a in answer:
-                                            result.append(str(a))
-                                        if len(result):
-                                            dns[dns_type] = result
-                                            logging.debug('Wappalyzer DNS %s for %s: %s', dns_type, dns_domain, json.dumps(result))
-                                    except Exception:
-                                        logging.exception('Error doing wappalyzer DNS %s lookup for %s', dns_type, self.document_domain)
+                            level_results = {}
+                            results_lock = threading.Lock()
+
+                            def _lookup_dns(record_type, domain=dns_domain, res=dns_resolver, out=level_results, lock=results_lock):
+                                try:
+                                    result = []
+                                    answer = res.query(domain, record_type.upper(), raise_on_no_answer=False)
+                                    for a in answer:
+                                        result.append(str(a))
+                                    if len(result):
+                                        with lock:
+                                            out[record_type] = result
+                                        logging.debug('Wappalyzer DNS %s for %s: %s', record_type, domain, json.dumps(result))
+                                except Exception:
+                                    logging.exception('Error doing wappalyzer DNS %s lookup for %s', record_type, self.document_domain)
+
+                            threads = []
+                            for dns_type in pending_types:
+                                t = threading.Thread(target=_lookup_dns, args=(dns_type,))
+                                t.start()
+                                threads.append(t)
+                            for t in threads:
+                                t.join()
+                            for dns_type in pending_types:
+                                if dns_type in level_results:
+                                    dns[dns_type] = level_results[dns_type]
                         except Exception:
                             logging.exception('Error doing wappalyzer DNS lookup')
                         # Walk up a step in case we need to look up a parent-domain record
@@ -1222,64 +1260,91 @@ class DevtoolsBrowser(object):
         """Build the wappalyzer script to run in-browser"""
         script = None
         try:
-            with open(os.path.join(self.support_path, 'Wappalyzer', 'script.js')) as f_in:
-                script = f_in.read()
-            if script is not None:
-                # See if there is a test-specific or updated Wappalyzer
-                wappalyzer_path = os.path.join(self.support_path, 'Wappalyzer', 'wappalyzer.js')
-                categories_path = os.path.join(self.support_path, 'Wappalyzer', 'categories.json')
-                technologies_path = os.path.join(self.support_path, 'Wappalyzer', 'technologies')
-                #for location in ['persistent_dir', 'test_shared_dir']:
-                for location in ['test_shared_dir']:
-                    if location in self.job:
-                        path = os.path.join(self.job[location], 'wappalyzer')
-                        if os.path.exists(path):
-                            wappalyzer_path = os.path.join(path, 'src', 'js', 'wappalyzer.js')
-                            categories_path = os.path.join(path, 'src', 'categories.json')
-                            technologies_path = os.path.join(path, 'src', 'technologies')
-                wappalyzer = None
-                logging.debug("Using Wappalyzer from %s", wappalyzer_path)
-                with open(wappalyzer_path) as f_in:
-                    wappalyzer = f_in.read()
-                if wappalyzer is not None:
-                    technologies = {}
-                    categories = {}
-                    with io.open(categories_path, 'r', encoding='utf-8') as f_in:
-                        categories = json.load(f_in)
-                    for filename in sorted(glob.glob(os.path.join(technologies_path, '*.json'))):
-                        with io.open(filename, 'r', encoding='utf-8') as f_in:
-                            technologies.update(json.load(f_in))
-                    if technologies and categories:
-                        # Format the headers as a dictionary of lists
-                        headers = {}
-                        if response_headers is not None:
-                            if isinstance(response_headers, dict):
-                                for key in response_headers:
-                                    values = []
-                                    entry = response_headers[key]
-                                    if isinstance(entry, list):
-                                        values = entry
-                                    elif isinstance(entry, (str, unicode)):
-                                        entries = entry.split('\n')
-                                        for value in entries:
-                                            values.append(value.strip())
-                                    if values:
-                                        headers[key.lower()] = values
-                            elif isinstance(response_headers, list):
-                                for pair in response_headers:
-                                    if isinstance(pair, (str, unicode)):
-                                        parts = pair.split(':', 1)
-                                        key = parts[0].strip(' :\n\t').lower()
-                                        value = parts[1].strip(' :\n\t')
-                                        if key not in headers:
-                                            headers[key] = []
-                                        headers[key].append(value)
-                        script = script.replace('%WAPPALYZER%', wappalyzer)
-                        script = script.replace('%COOKIES%', json.dumps(cookies))
-                        script = script.replace('%DNS%', json.dumps(dns))
-                        script = script.replace('%RESPONSE_HEADERS%', json.dumps(headers))
-                        script = script.replace('%CATEGORIES%', json.dumps(categories))
-                        script = script.replace('%TECHNOLOGIES%', json.dumps(technologies))
+            script_path = os.path.join(self.support_path, 'Wappalyzer', 'script.js')
+            # See if there is a test-specific or updated Wappalyzer
+            wappalyzer_path = os.path.join(self.support_path, 'Wappalyzer', 'wappalyzer.js')
+            categories_path = os.path.join(self.support_path, 'Wappalyzer', 'categories.json')
+            technologies_path = os.path.join(self.support_path, 'Wappalyzer', 'technologies')
+            use_cache = True
+            #for location in ['persistent_dir', 'test_shared_dir']:
+            for location in ['test_shared_dir']:
+                if location in self.job:
+                    path = os.path.join(self.job[location], 'wappalyzer')
+                    if os.path.exists(path):
+                        wappalyzer_path = os.path.join(path, 'src', 'js', 'wappalyzer.js')
+                        categories_path = os.path.join(path, 'src', 'categories.json')
+                        technologies_path = os.path.join(path, 'src', 'technologies')
+                        use_cache = False
+            logging.debug("Using Wappalyzer from %s", wappalyzer_path)
+            cache_key = ('wappalyzer', script_path, wappalyzer_path, categories_path, technologies_path)
+            wappalyzer_mtime = os.path.getmtime(wappalyzer_path) if use_cache else None
+            agent_cache = self.job.get('cache') if (use_cache and isinstance(self.job, dict)) else None
+
+            def _load_wappalyzer_bundle():
+                loaded = None
+                with open(script_path) as f_in:
+                    template = f_in.read()
+                if template is not None:
+                    with open(wappalyzer_path) as f_in:
+                        wappalyzer = f_in.read()
+                    if wappalyzer is not None:
+                        technologies = {}
+                        categories = {}
+                        with io.open(categories_path, 'r', encoding='utf-8') as f_in:
+                            categories = json.load(f_in)
+                        for filename in sorted(glob.glob(os.path.join(technologies_path, '*.json'))):
+                            with io.open(filename, 'r', encoding='utf-8') as f_in:
+                                technologies.update(json.load(f_in))
+                        if technologies and categories:
+                            loaded = template.replace('%WAPPALYZER%', wappalyzer)
+                            loaded = loaded.replace('%CATEGORIES%', json.dumps(categories))
+                            loaded = loaded.replace('%TECHNOLOGIES%', json.dumps(technologies))
+                        else:
+                            loaded = template
+                    else:
+                        loaded = template
+                return loaded
+
+            if agent_cache is not None:
+                base_script = agent_cache.get_file_value(cache_key, wappalyzer_mtime, _load_wappalyzer_bundle)
+            elif use_cache:
+                cached = self._wappalyzer_cache.get(cache_key)
+                if cached is not None and cached[0] == wappalyzer_mtime:
+                    base_script = cached[1]
+                else:
+                    base_script = _load_wappalyzer_bundle()
+                    if base_script is not None:
+                        self._wappalyzer_cache[cache_key] = (wappalyzer_mtime, base_script)
+            else:
+                base_script = _load_wappalyzer_bundle()
+            if base_script is not None:
+                # Format the headers as a dictionary of lists
+                headers = {}
+                if response_headers is not None:
+                    if isinstance(response_headers, dict):
+                        for key in response_headers:
+                            values = []
+                            entry = response_headers[key]
+                            if isinstance(entry, list):
+                                values = entry
+                            elif isinstance(entry, (str, unicode)):
+                                entries = entry.split('\n')
+                                for value in entries:
+                                    values.append(value.strip())
+                            if values:
+                                headers[key.lower()] = values
+                    elif isinstance(response_headers, list):
+                        for pair in response_headers:
+                            if isinstance(pair, (str, unicode)):
+                                parts = pair.split(':', 1)
+                                key = parts[0].strip(' :\n\t').lower()
+                                value = parts[1].strip(' :\n\t')
+                                if key not in headers:
+                                    headers[key] = []
+                                headers[key].append(value)
+                script = base_script.replace('%COOKIES%', json.dumps(cookies))
+                script = script.replace('%DNS%', json.dumps(dns))
+                script = script.replace('%RESPONSE_HEADERS%', json.dumps(headers))
         except Exception:
             logging.exception('Error building wappalyzer script')
         return script

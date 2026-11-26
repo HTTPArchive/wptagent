@@ -11,6 +11,7 @@ import multiprocessing
 import os
 import platform
 import re
+import shlex
 import shutil
 import struct
 import subprocess
@@ -28,6 +29,7 @@ try:
     import ujson as json
 except BaseException:
     import json
+from .cache import AgentCache, MISSING
 
 
 class OptimizationChecks(object):
@@ -35,6 +37,9 @@ class OptimizationChecks(object):
     def __init__(self, job, task, requests):
         self.job = job
         self.task = task
+        self.cache = job.get('cache') if isinstance(job, dict) else None
+        self._body_hashes = {}
+        self._hash_lock = threading.Lock()
         self.running_checks = False
         self.requests = requests
         self.cdn_thread = None
@@ -519,8 +524,23 @@ class OptimizationChecks(object):
                 if gz_file:
                     gz_file.write(json.dumps(self.results))
                     gz_file.close()
+        if self.cache is not None:
+            self.cache.log_stats()
         logging.debug('Optimization checks complete')
         return self.results
+
+    def get_body_hash(self, path):
+        """Return cached SHA-256 hex digest of a response body file for this check run"""
+        if not path:
+            return None
+        abs_path = os.path.abspath(path)
+        with self._hash_lock:
+            if abs_path in self._body_hashes:
+                return self._body_hashes[abs_path]
+        digest = AgentCache.hash_file(abs_path)
+        with self._hash_lock:
+            self._body_hashes[abs_path] = digest
+        return digest
 
     def check_keep_alive(self):
         """Check for requests where the connection is force-closed"""
@@ -736,6 +756,11 @@ class OptimizationChecks(object):
         count = 0
         for domain in domains:
             if not domains[domain]:
+                if self.cache is not None:
+                    cached_provider = self.cache.cdn_dns.get(domain.lower())
+                    if cached_provider is not MISSING:
+                        domains[domain] = cached_provider
+                        continue
                 count += 1
                 self.dns_lookup_queue.put(domain)
         if count:
@@ -784,9 +809,9 @@ class OptimizationChecks(object):
         self.cdn_time = monotonic() - start
         self.profile_end('cdn')
 
-    def find_dns_cdn(self, domain, depth=0):
+    def find_dns_cdn(self, domain, depth=0, timeout_flag=None):
         """Recursively check a CNAME chain"""
-        from dns import resolver, reversename
+        from dns import exception as dns_exception, resolver, reversename
         dns_resolver = resolver.Resolver()
         dns_resolver.timeout = 5
         dns_resolver.lifetime = 5
@@ -803,12 +828,15 @@ class OptimizationChecks(object):
                             if name != domain:
                                 provider = self.check_cdn_name(name)
                                 if provider is None and depth < 10:
-                                    provider = self.find_dns_cdn(name, depth + 1)
+                                    provider = self.find_dns_cdn(name, depth + 1, timeout_flag=timeout_flag)
                             if provider is not None:
                                 logging.debug("provider %s => %s", domain, provider)
                                 break
                         except Exception:
                             pass
+            except dns_exception.Timeout:
+                if timeout_flag is not None:
+                    timeout_flag[0] = True
             except Exception:
                 pass
         # Try a reverse-lookup of the address
@@ -824,6 +852,9 @@ class OptimizationChecks(object):
                         logging.debug("PTR %s => %s => %s", domain, addr, name)
                         if name:
                             provider = self.check_cdn_name(name)
+            except dns_exception.Timeout:
+                if timeout_flag is not None:
+                    timeout_flag[0] = True
             except Exception:
                 pass
         return provider
@@ -839,7 +870,10 @@ class OptimizationChecks(object):
                     break
                 else:
                     try:
-                        provider = self.find_dns_cdn(domain)
+                        timeout_flag = [False]
+                        provider = self.find_dns_cdn(domain, timeout_flag=timeout_flag)
+                        if self.cache is not None and (provider is not None or not timeout_flag[0]):
+                            self.cache.cdn_dns.set(domain.lower(), provider if provider is not None else '')
                         if provider is not None:
                             self.dns_result_queue.put({'domain': domain, 'provider': provider})
                     except Exception:
@@ -924,26 +958,32 @@ class OptimizationChecks(object):
                     if sniff_type is not None:
                         check['score'] = -1
                     else:
-                        out_file = request['body'] + '.gzip'
-                        with open(request['body'], 'rb') as f_in:
-                            with gzip.open(out_file, 'wb', 7) as f_out:
-                                shutil.copyfileobj(f_in, f_out)
-                        if os.path.isfile(out_file):
-                            target_size = os.path.getsize(out_file)
-                            try:
-                                os.remove(out_file)
-                            except Exception:
-                                pass
-                            if target_size is not None:
-                                delta = content_length - target_size
-                                # Only count it if there is at least 1 packet and 10% savings
-                                if target_size > 0 and \
-                                        delta > 1400 and \
-                                        target_size < (content_length * 0.9):
-                                    check['target_size'] = target_size
-                                    check['score'] = int(target_size * 100 / content_length)
-                                else:
-                                    check['score'] = -1
+                        target_size = MISSING
+                        body_hash = self.get_body_hash(request['body']) if self.cache is not None else None
+                        if self.cache is not None and body_hash is not None:
+                            target_size = self.cache.gzip.get(body_hash)
+                        if target_size is MISSING:
+                            target_size = None
+                            out_file = request['body'] + '.gzip'
+                            with open(request['body'], 'rb') as f_in:
+                                with gzip.open(out_file, 'wb', 7) as f_out:
+                                    shutil.copyfileobj(f_in, f_out)
+                            if os.path.isfile(out_file):
+                                target_size = os.path.getsize(out_file)
+                                try:
+                                    os.remove(out_file)
+                                except Exception:
+                                    pass
+                            if self.cache is not None and body_hash is not None and target_size is not None:
+                                self.cache.gzip.set(body_hash, target_size)
+                        if target_size is not None:
+                            delta = content_length - target_size
+                            # Only count it if there is at least 1 packet and 10% savings
+                            if target_size > 0 and \
+                                    delta > 1400 and \
+                                    target_size < (content_length * 0.9):
+                                check['target_size'] = target_size
+                                check['score'] = int(target_size * 100 / content_length)
                             else:
                                 check['score'] = -1
                         else:
@@ -955,24 +995,201 @@ class OptimizationChecks(object):
         self.gzip_time = monotonic() - start
         self.profile_end('gzip')
 
+    def _get_im_convert_cmd(self):
+        """Split the configured ImageMagick convert command into an argv list"""
+        cmd_str = self.job['image_magick']['convert']
+        parts = shlex.split(cmd_str, posix=(platform.system() != 'Windows'))
+        if platform.system() == 'Windows':
+            parts = [p.strip('"') for p in parts]
+        return parts
+
+    def _clean_exiftool_entry(self, metadata):
+        """Strip volatile filesystem fields from an exiftool metadata dict"""
+        if not isinstance(metadata, dict):
+            return None
+        metadata = dict(metadata)
+        if 'SourceFile' in metadata:
+            del metadata['SourceFile']
+        if 'File' in metadata and isinstance(metadata['File'], dict):
+            file_info = dict(metadata['File'])
+            for key in ['FileName', 'Directory', 'FileModifyDate', 'FileAccessDate', 'FileInodeChangeDate', 'FilePermissions']:
+                if key in file_info:
+                    del file_info[key]
+            metadata['File'] = file_info
+        return metadata
+
+    def _run_exiftool_batch(self, paths):
+        """Run exiftool once per batch of image files and return {abspath: metadata}"""
+        results = {}
+        if not paths:
+            return results
+        chunk_size = 50
+        for i in range(0, len(paths), chunk_size):
+            chunk = paths[i:i + chunk_size]
+            parsed = False
+            try:
+                proc = subprocess.Popen(['exiftool', '-j', '-g'] + chunk,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
+                out, _ = proc.communicate()
+                if out:
+                    if isinstance(out, bytes):
+                        out = out.decode('utf-8', errors='replace')
+                    entries = json.loads(out)
+                    if isinstance(entries, list):
+                        for entry in entries:
+                            if isinstance(entry, dict) and 'SourceFile' in entry:
+                                src = os.path.abspath(entry['SourceFile'])
+                                cleaned = self._clean_exiftool_entry(entry)
+                                if cleaned is not None:
+                                    results[src] = cleaned
+                        parsed = True
+            except OSError:
+                # exiftool is not installed
+                return results
+            except Exception:
+                parsed = False
+            if not parsed and len(chunk) > 1:
+                for path in chunk:
+                    try:
+                        out = subprocess.check_output(['exiftool', '-j', '-g', path],
+                                                      stderr=subprocess.PIPE,
+                                                      encoding='UTF-8')
+                        entries = json.loads(out)
+                        if isinstance(entries, list) and len(entries) == 1:
+                            cleaned = self._clean_exiftool_entry(entries[0])
+                            if cleaned is not None:
+                                results[os.path.abspath(path)] = cleaned
+                    except Exception:
+                        pass
+        return results
+
+    def _get_image_content_length(self, request):
+        content_length = None
+        if 'response_headers' in request:
+            content_length = self.get_header_value(request['response_headers'], 'Content-Length')
+        if content_length is not None:
+            match = re.search(r'\d+', str(content_length))
+            content_length = int(match.group()) if match else None
+        elif 'transfer_size' in request:
+            content_length = request['transfer_size']
+        return content_length
+
+    def _build_image_check_from_cache(self, sniff_type, content_length, cached):
+        """Construct an image check result from cached content-only analysis, or None if incomplete"""
+        check = {'score': -1,
+                 'size': content_length,
+                 'target_size': content_length,
+                 'info': {'detected_type': sniff_type}}
+        if 'metadata' in cached:
+            check['info']['metadata'] = cached['metadata']
+        if 'magick' in cached:
+            check['info']['magick'] = cached['magick']
+        if sniff_type == 'jpeg':
+            if content_length is None:
+                return None
+            if content_length < 1400:
+                check['score'] = 100
+            elif 'jpeg_target_size' in cached:
+                target_size = cached['jpeg_target_size']
+                if target_size is not None:
+                    delta = content_length - target_size
+                    if target_size > 0 and delta > 1400:
+                        check['target_size'] = target_size
+                        check['score'] = int(target_size * 100 / content_length)
+                    else:
+                        check['score'] = 100
+            else:
+                return None
+        elif sniff_type == 'png':
+            if content_length is None:
+                return None
+            if content_length < 1400:
+                check['score'] = 100
+            elif 'png_target_size' in cached:
+                target_size = cached['png_target_size']
+                if target_size is not None:
+                    delta = content_length - target_size
+                    if target_size > 0 and delta > 1400:
+                        check['target_size'] = target_size
+                        check['score'] = int(target_size * 100 / content_length)
+                    else:
+                        check['score'] = 100
+            else:
+                return None
+        elif sniff_type == 'gif':
+            if content_length is None:
+                return None
+            if content_length < 1400:
+                check['score'] = 100
+            elif 'gif_animated' in cached:
+                is_animated = cached['gif_animated']
+                check['info']['animated'] = is_animated
+                if is_animated:
+                    check['score'] = 100
+                elif 'gif_target_size' in cached:
+                    target_size = cached['gif_target_size']
+                    if target_size is not None:
+                        delta = content_length - target_size
+                        if target_size > 0 and delta > 1400:
+                            check['target_size'] = target_size
+                            check['score'] = int(target_size * 100 / content_length)
+                        else:
+                            check['score'] = 100
+                else:
+                    return None
+            else:
+                return None
+        elif sniff_type in ('webp', 'avif', 'jxl'):
+            check['score'] = 100
+        return check
+
     def check_images(self):
         """Check each request to see if images can be compressed better"""
         self.profile_start('images')
         start = monotonic()
-        count = 0
+        image_types = {'jpeg', 'png', 'gif', 'webp', 'avif', 'jxl'}
+        image_items = []
+        exif_paths = []
+        seen_paths = set()
         for request_id in self.requests:
-            count += 1
-            self.image_queue.put(request_id)
-        threads = []
-        thread_count = min(count, 4)
-        for _ in range(thread_count):
-            self.image_queue.put(None)
-        for _ in range(thread_count):
-            thread = threading.Thread(target=self.image_worker)
-            thread.start()
-            threads.append(thread)
-        for thread in threads:
-            thread.join()
+            request = self.requests[request_id]
+            if 'body' in request:
+                sniff_type = self.sniff_file_content(request['body'])
+                if sniff_type in image_types:
+                    body_hash = self.get_body_hash(request['body']) if self.cache is not None else None
+                    cached_entry = None
+                    if self.cache is not None and body_hash is not None:
+                        cached = self.cache.images.get((sniff_type, body_hash))
+                        if cached is not MISSING:
+                            content_length = self._get_image_content_length(request)
+                            built = self._build_image_check_from_cache(sniff_type, content_length, cached)
+                            if built is not None:
+                                self.image_results[request_id] = built
+                                continue
+                            cached_entry = cached
+                    image_items.append((request_id, sniff_type, body_hash, cached_entry))
+                    if cached_entry is None:
+                        abs_path = os.path.abspath(request['body'])
+                        if abs_path not in seen_paths:
+                            seen_paths.add(abs_path)
+                            exif_paths.append(abs_path)
+        self.exiftool_metadata = self._run_exiftool_batch(exif_paths)
+        count = len(image_items)
+        if count > 0:
+            for item in image_items:
+                self.image_queue.put(item)
+            threads = []
+            max_workers = max(4, multiprocessing.cpu_count() or 4)
+            thread_count = min(count, max_workers)
+            for _ in range(thread_count):
+                self.image_queue.put(None)
+            for _ in range(thread_count):
+                thread = threading.Thread(target=self.image_worker)
+                thread.start()
+                threads.append(thread)
+            for thread in threads:
+                thread.join()
         self.image_time = monotonic() - start
         self.profile_end('images')
 
@@ -980,29 +1197,27 @@ class OptimizationChecks(object):
         """Handle the image checks in multiple threads"""
         try:
             while True:
-                request_id = self.image_queue.get(5)
-                if request_id is None:
+                item = self.image_queue.get(5)
+                if item is None:
                     self.image_queue.task_done()
                     break
                 else:
-                    self.check_image(request_id)
+                    if isinstance(item, tuple):
+                        self.check_image(*item)
+                    else:
+                        self.check_image(item)
                     self.image_queue.task_done()
         except Exception:
             pass
 
-    def check_image(self, request_id):
+    def check_image(self, request_id, sniff_type=None, body_hash=None, cached_entry=None):
         """ Run the image checks on a single image """
         try:
             request = self.requests[request_id]
-            content_length = None
-            if 'response_headers' in request:
-                content_length = self.get_header_value(request['response_headers'], 'Content-Length')
-            if content_length is not None:
-                content_length = int(re.search(r'\d+', str(content_length)).group())
-            elif 'transfer_size' in request:
-                content_length = request['transfer_size']
+            content_length = self._get_image_content_length(request)
             if 'body' in request:
-                sniff_type = self.sniff_file_content(request['body'])
+                if sniff_type is None:
+                    sniff_type = self.sniff_file_content(request['body'])
                 if sniff_type in ['jpeg', 'png', 'gif', 'webp', 'avif', 'jxl']:
                     if sniff_type is None:
                         sniff_type = 'Unknown'
@@ -1012,44 +1227,45 @@ class OptimizationChecks(object):
                                 'info': {
                                     'detected_type': sniff_type
                                 }}
-                    # Use exiftool to extract the image metadata if it is installed
-                    try:
-                        metadata = json.loads(subprocess.check_output(['exiftool', '-j', '-g', request['body']], encoding='UTF-8'))
-                        if metadata is not None:
-                            if isinstance(metadata, list) and len(metadata) == 1:
-                                metadata = metadata[0]
-                            if 'SourceFile' in metadata:
-                                del metadata['SourceFile']
-                            if 'File' in metadata:
-                                for key in ['FileName', 'Directory', 'FileModifyDate', 'FileAccessDate', 'FileInodeChangeDate', 'FilePermissions']:
-                                    if key in metadata['File']:
-                                        del metadata['File'][key]
-                            check['info']['metadata'] = metadata
-                    except Exception:
-                        pass
+                    cache_entry = dict(cached_entry) if cached_entry is not None else {}
+                    # Use batched exiftool metadata if available
+                    if 'metadata' in cache_entry:
+                        check['info']['metadata'] = cache_entry['metadata']
+                    else:
+                        abs_body = os.path.abspath(request['body'])
+                        if hasattr(self, 'exiftool_metadata') and abs_body in self.exiftool_metadata:
+                            check['info']['metadata'] = self.exiftool_metadata[abs_body]
+                            cache_entry['metadata'] = self.exiftool_metadata[abs_body]
                     # Use imagemagick to convert metadata to json
-                    try:
-                        command = '{0} "{1}[0]" json:-'.format(self.job['image_magick']['convert'], request['body'])
-                        magick_str = subprocess.check_output(command, shell=True, encoding='UTF-8')
+                    im_convert = self._get_im_convert_cmd()
+                    if 'magick' in cache_entry:
+                        check['info']['magick'] = cache_entry['magick']
+                    elif cached_entry is None:
                         try:
-                            magick = json.loads(magick_str)
+                            magick_str = subprocess.check_output(
+                                im_convert + [request['body'] + '[0]', 'json:-'],
+                                stderr=subprocess.PIPE,
+                                encoding='UTF-8')
+                            try:
+                                magick = json.loads(magick_str)
+                            except Exception:
+                                # Fix issues with imagemagick's json output
+                                magick_str = magick_str.replace('}\n{', '},\n{')
+                                magick_str = re.sub(r"([\"\w])(\n\s+\")", r"\1,\2", magick_str)
+                                magick_str = '[' + magick_str + ']'
+                                magick = json.loads(magick_str)
+                            if magick and 'image' in magick[0]:
+                                image = magick[0]['image']
+                                if len(magick) > 1:
+                                    image['FrameCount'] = len(magick)
+                                remove = ['name', 'artifacts', 'colormap', 'version']
+                                for key in remove:
+                                    if key in image:
+                                        del image[key]
+                                check['info']['magick'] = image
+                                cache_entry['magick'] = image
                         except Exception:
-                            # Fix issues with imagemagick's json output
-                            magick_str = magick_str.replace('}\n{', '},\n{')
-                            magick_str = re.sub(r"([\"\w])(\n\s+\")", r"\1,\2", magick_str)
-                            magick_str = '[' + magick_str + ']'
-                            magick = json.loads(magick_str)
-                        if magick and 'image' in magick[0]:
-                            image = magick[0]['image']
-                            if len(magick) > 1:
-                                image['FrameCount'] = len(magick)
-                            remove = ['name', 'artifacts', 'colormap', 'version']
-                            for key in remove:
-                                if key in image:
-                                    del image[key]
-                            check['info']['magick'] = image
-                    except Exception:
-                        pass
+                            pass
                     # Extract format-specific data
                     if sniff_type == 'jpeg':
                         if content_length < 1400:
@@ -1057,13 +1273,13 @@ class OptimizationChecks(object):
                         else:
                             # Compress it as a quality 85 stripped progressive image and compare
                             jpeg_file = request['body'] + '.jpg'
-                            command = '{0} -define jpeg:dct-method=fast "{1}" '\
-                                '-strip -interlace Plane -quality 85 '\
-                                '"{2}"'.format(self.job['image_magick']['convert'],
-                                               request['body'], jpeg_file)
-                            subprocess.call(command, shell=True)
+                            subprocess.call(
+                                im_convert + ['-define', 'jpeg:dct-method=fast', request['body'],
+                                              '-strip', '-interlace', 'Plane', '-quality', '85',
+                                              jpeg_file])
                             if os.path.isfile(jpeg_file):
                                 target_size = os.path.getsize(jpeg_file)
+                                cache_entry['jpeg_target_size'] = target_size
                                 try:
                                     os.remove(jpeg_file)
                                 except Exception:
@@ -1075,6 +1291,8 @@ class OptimizationChecks(object):
                                     check['score'] = int(target_size * 100 / content_length)
                                 else:
                                     check['score'] = 100
+                            else:
+                                cache_entry['jpeg_target_size'] = None
                     elif sniff_type == 'png':
                         if 'response_body' not in request:
                             request['response_body'] = ''
@@ -1108,6 +1326,7 @@ class OptimizationChecks(object):
                                     valid = False
                                     bytes_remaining = 0
                             if valid:
+                                cache_entry['png_target_size'] = target_size
                                 delta = content_length - target_size
                                 # Only count it if there is at least 1 packet savings
                                 if target_size > 0 and delta > 1400:
@@ -1115,6 +1334,8 @@ class OptimizationChecks(object):
                                     check['score'] = int(target_size * 100 / content_length)
                                 else:
                                     check['score'] = 100
+                            else:
+                                cache_entry['png_target_size'] = None
                     elif sniff_type == 'gif':
                         if content_length < 1400:
                             check['score'] = 100
@@ -1129,15 +1350,16 @@ class OptimizationChecks(object):
                                 else:
                                     is_animated = True
                             check['info']['animated'] = is_animated
+                            cache_entry['gif_animated'] = is_animated
                             if is_animated:
                                 check['score'] = 100
                             else:
                                 # Convert it to a PNG
                                 png_file = request['body'] + '.png'
-                                command = 'convert "{0}" "{1}"'.format(request['body'], png_file)
-                                subprocess.call(command, shell=True)
+                                subprocess.call(im_convert + [request['body'], png_file])
                                 if os.path.isfile(png_file):
                                     target_size = os.path.getsize(png_file)
+                                    cache_entry['gif_target_size'] = target_size
                                     try:
                                         os.remove(png_file)
                                     except Exception:
@@ -1149,12 +1371,16 @@ class OptimizationChecks(object):
                                         check['score'] = int(target_size * 100 / content_length)
                                     else:
                                         check['score'] = 100
+                                else:
+                                    cache_entry['gif_target_size'] = None
                     elif sniff_type == 'webp':
                         check['score'] = 100
                     elif sniff_type == 'avif':
                         check['score'] = 100
                     elif sniff_type == 'jxl':
                         check['score'] = 100
+                    if self.cache is not None and body_hash is not None:
+                        self.cache.images.set((sniff_type, body_hash), cache_entry)
                     with self.image_lock:
                         self.image_results[request_id] = check
         except Exception:
@@ -1171,6 +1397,12 @@ class OptimizationChecks(object):
                 if 'body' in request:
                     sniff_type = self.sniff_file_content(request['body'])
                     if sniff_type == 'jpeg':
+                        body_hash = self.get_body_hash(request['body']) if self.cache is not None else None
+                        if self.cache is not None and body_hash is not None:
+                            cached = self.cache.progressive.get(body_hash)
+                            if cached is not MISSING:
+                                self.progressive_results[request_id] = cached
+                                continue
                         check = {'size': os.path.getsize(request['body']), 'scan_count': 1}
                         image = Image.open(request['body'])
                         info = dict(image.info)
@@ -1218,6 +1450,8 @@ class OptimizationChecks(object):
                                         pos += block_size
                             except Exception:
                                 logging.exception('Error scanning JPEG')
+                        if self.cache is not None and body_hash is not None:
+                            self.cache.progressive.set(body_hash, check)
                         self.progressive_results[request_id] = check
             except Exception:
                 logging.exception('Error checking progressive')
@@ -1236,7 +1470,14 @@ class OptimizationChecks(object):
                     if 'body' in request:
                         sniff_type = self.sniff_file_content(request['body'])
                         if sniff_type is not None and sniff_type in ['OTF', 'TTF', 'WOFF', 'WOFF2']:
-                            font_info = font_metadata.read_metadata(request['body'])
+                            body_hash = self.get_body_hash(request['body']) if self.cache is not None else None
+                            font_info = MISSING
+                            if self.cache is not None and body_hash is not None:
+                                font_info = self.cache.fonts.get(body_hash)
+                            if font_info is MISSING:
+                                font_info = font_metadata.read_metadata(request['body'])
+                                if self.cache is not None and body_hash is not None:
+                                    self.cache.fonts.set(body_hash, font_info)
                             if font_info is not None:
                                 self.font_results[request_id] = font_info
                 except Exception:
@@ -1263,7 +1504,14 @@ class OptimizationChecks(object):
                         if 'body' in request and 'response_headers' in request:
                             content_type = self.get_header_value(request['response_headers'], 'Content-Type')
                             if content_type == 'application/wasm':
-                                stats = json.loads(subprocess.check_output([wasm_stats, request['body']], encoding='UTF-8'))
+                                body_hash = self.get_body_hash(request['body']) if self.cache is not None else None
+                                stats = MISSING
+                                if self.cache is not None and body_hash is not None:
+                                    stats = self.cache.wasm.get(body_hash)
+                                if stats is MISSING:
+                                    stats = json.loads(subprocess.check_output([wasm_stats, request['body']], encoding='UTF-8'))
+                                    if self.cache is not None and body_hash is not None:
+                                        self.cache.wasm.set(body_hash, stats)
                                 if stats is not None:
                                     self.wasm_results[request_id] = stats
                     except Exception:

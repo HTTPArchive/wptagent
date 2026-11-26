@@ -578,14 +578,23 @@ class WebPageTest(object):
                 # Add the security insights custom metrics locally if requested
                 if 'securityInsights' in job:
                     js_directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'js')
+                    cache = getattr(self, 'cache', None)
                     if 'customMetrics' not in job:
                         job['customMetrics'] = {}
                     if 'jsLibsVulns' not in job['customMetrics']:
-                        with open(os.path.join(js_directory, 'jsLibsVulns.js'), 'rt') as f_in:
-                            job['customMetrics']['jsLibsVulns'] = f_in.read()
+                        js_path = os.path.join(js_directory, 'jsLibsVulns.js')
+                        if cache is not None:
+                            job['customMetrics']['jsLibsVulns'] = cache.read_text(js_path, encoding='utf-8')
+                        else:
+                            with open(js_path, 'rt') as f_in:
+                                job['customMetrics']['jsLibsVulns'] = f_in.read()
                     if 'securityHeaders' not in job['customMetrics']:
-                        with open(os.path.join(js_directory, 'securityHeaders.js'), 'rt') as f_in:
-                            job['customMetrics']['securityHeaders'] = f_in.read()
+                        js_path = os.path.join(js_directory, 'securityHeaders.js')
+                        if cache is not None:
+                            job['customMetrics']['securityHeaders'] = cache.read_text(js_path, encoding='utf-8')
+                        else:
+                            with open(js_path, 'rt') as f_in:
+                                job['customMetrics']['securityHeaders'] = f_in.read()
                 if 'browser' not in job:
                     job['browser'] = 'Chrome'
                 if 'runs' not in job:
