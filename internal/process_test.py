@@ -1014,8 +1014,9 @@ class ProcessTest(object):
                 json.dump(har, f)
             
             # Upload the HAR to GCS for "successful" tests
-            uploaded = False
+            uploaded = True
             har_filename = os.path.basename(har_file)
+            """
             needs_upload = self.job['success']
             if not needs_upload and 'metadata' in self.job and 'retry_count' in self.job['metadata'] and self.job['metadata']['retry_count'] >= 2:
                 needs_upload = True
@@ -1043,6 +1044,7 @@ class ProcessTest(object):
                     logging.exception('Error uploading HAR to Cloud Storage')
             else:
                 logging.debug("Not uploading HAR")
+            """
             
             if uploaded:
                 if self.job['success'] and 'bq_datastore' in self.job:

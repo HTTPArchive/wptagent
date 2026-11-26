@@ -266,23 +266,8 @@ class WPTAgent(object):
         self.pubsub_message = message
         try:
             test_json = json.loads(message.data.decode('utf-8'))
-            # Don't re-run the same test if it already exists in gcs
-            exists = False
-            if 'gcs_har_upload' in test_json and \
-                    'bucket' in test_json['gcs_har_upload'] and \
-                    'path' in test_json['gcs_har_upload']:
-                try:
-                    from google.cloud import storage
-                    client = storage.Client()
-                    bucket = client.get_bucket(test_json['gcs_har_upload']['bucket'])
-                    gcs_path = os.path.join(test_json['gcs_har_upload']['path'], test_json['Test ID'] + '.har.gz')
-                    blob = bucket.blob(gcs_path)
-                    exists = blob.exists()
-                except Exception:
-                    logging.exception('Error checking for HAR in Cloud Storage')
-            if not exists:
-                self.job = self.wpt.process_job_json(test_json)
-                self.run_job()
+            self.job = self.wpt.process_job_json(test_json)
+            self.run_job()
         except Exception:
             logging.exception('Error processing pubsub job')
         self.pubsub_message = None
